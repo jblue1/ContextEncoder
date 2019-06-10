@@ -217,23 +217,16 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 @click.option('--use_gpu/--no_gpu', default=False)
 @click.option('--epochs', default=50)
 def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
+    train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
+    train_dataset = train_dataset.batch(batch_size)
+
+    val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap)
+    val_dataset = val_dataset.batch(batch_size)
     if use_gpu:
         gpu = input('Choose GPU to use:')
         with tf.device('/GPU:{}'.format(gpu)):
-            train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
-            train_dataset = train_dataset.batch(batch_size)
-
-            val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap)
-            val_dataset = val_dataset.batch(batch_size)
-
             train(train_dataset, val_dataset, epochs, overlap, use_gpu)
     else:
-        train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
-        train_dataset = train_dataset.batch(batch_size)
-
-        val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap)
-        val_dataset = val_dataset.batch(batch_size)
-
         train(train_dataset, val_dataset, epochs, overlap, use_gpu)
 
 
