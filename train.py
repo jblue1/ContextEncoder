@@ -16,7 +16,7 @@ import click
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 MSE = tf.keras.losses.MeanSquaredError()
 generator = model.build_autoencoder(True)
-discriminator = model.build_discriminator()
+discriminator = model.build_discriminator(True)
 generator_optimizer = tf.keras.optimizers.Adam(2e-2)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-3)
 
@@ -133,6 +133,7 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss):
     ax2.set_ylabel('Loss')
     ax2.set_title('Discriminator Loss')
     ax2.legend()
+    plt.savefig('Loss_history.png')
     plt.show()
 
 
@@ -186,20 +187,24 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
             gen_center = generator(test_image, training=False)[0, :, :, :]
             test_image = test_image[0, :, :, :]
             test_center = center_batch[0, :, :, :]
+            if use_gpu:
+                test_image = tf.transpose(test_image, (1, 2, 0))
+                gen_center = tf.transpose(gen_center, (1, 2, 0))
+                test_center = tf.transpose(test_center, (1, 2, 0))
             gen_center = (gen_center + 1) / 2
             test_image = (test_image + 1) / 2
             test_center = (test_center + 1) / 2
             plt.imshow(test_image)
             plt.title('Image. Epoch {}'.format(epoch))
-            plt.savefig('Image. Epoch {}'.format(epoch))
+            plt.savefig('Image. Epoch_{}.png'.format(epoch))
             plt.show()
             plt.imshow(test_center)
             plt.title('Center. Epoch {}'.format(epoch))
-            plt.savefig('Center. Epoch {}'.format(epoch))
+            plt.savefig('Center. Epoch_{}.png'.format(epoch))
             plt.show()
             plt.imshow(gen_center)
             plt.title('Generated Center. Epoch: {}'.format(epoch))
-            plt.savefig('Generated Center. Epoch: {}'.format(epoch))
+            plt.savefig('Generated Center. Epoch_{}.png'.format(epoch))
             plt.show()
 
         list_train_gen_loss.append(train_gen_loss)

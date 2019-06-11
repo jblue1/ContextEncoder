@@ -76,7 +76,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
     return autoencoder
 
 
-def build_discriminator(channels=3, height=64, width=64, use_gpu=False):
+def build_discriminator(use_gpu, channels=3, height=64, width=64):
     if use_gpu:
         data_format = 'channels_first'
         axis = 1
@@ -90,22 +90,22 @@ def build_discriminator(channels=3, height=64, width=64, use_gpu=False):
                                kernel_size=4,
                                strides=2,
                                padding='same',
-                               data_format=data_format)(discriminator_inputs)
+                               data_format=data_format, name='D1')(discriminator_inputs)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
-    x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
+    x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format, name='D2')(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
-    x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
+    x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format, name='D3')(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
-    x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
+    x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format, name='D4')(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     discriminator_output = tf.keras.layers.Conv2D(filters=1,
                                                   kernel_size=4,
                                                   activation='sigmoid',
-                                                  data_format=data_format)(x)
+                                                  data_format=data_format, name='sigmoid')(x)
 
     discriminator = tf.keras.Model(discriminator_inputs, discriminator_output, name='discriminator')
 
