@@ -70,7 +70,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                         padding='same',
                                         activation='tanh',
                                         data_format=data_format)(x)
-    decoder_output = tf.keras.layers.BatchNormalization()(x)
+    decoder_output = tf.keras.layers.BatchNormalization(axis)(x)
     autoencoder = tf.keras.Model(encoder_input, decoder_output, name='autoencoder')
 
     return autoencoder
@@ -111,3 +111,9 @@ def build_discriminator(channels=3, height=64, width=64, use_gpu=False):
 
     return discriminator
 
+def main():
+    auto = build_autoencoder(True)
+    auto.summary()
+
+if __name__ == '__main__':
+    main()
