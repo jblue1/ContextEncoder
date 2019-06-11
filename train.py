@@ -164,13 +164,18 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
         train_disc_loss = 0
         val_gen_loss = 0
         val_disc_loss = 0
-        count = 0
         for image_batch, center_batch in train_dataset:
+            if use_gpu:
+                image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
+                center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
             gen_loss, disc_loss = take_step(image_batch, center_batch, overlap, use_gpu)
             train_gen_loss += gen_loss
             train_disc_loss += disc_loss
 
         for image_batch, center_batch in val_dataset:
+            if use_gpu:
+                image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
+                center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
             gen_loss, disc_loss = take_step(image_batch, center_batch, overlap, use_gpu, training=False)
             val_gen_loss += gen_loss
             val_disc_loss += disc_loss
