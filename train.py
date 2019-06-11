@@ -221,7 +221,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 
     plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss)
 
-'''
+
 @click.command()
 @click.argument('train_data_path', type=click.Path(exists=True, readable=True))
 @click.argument('val_data_path', type=click.Path(exists=True))
@@ -229,7 +229,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 @click.option('--batch_size', default=64)
 @click.option('--use_gpu/--no_gpu', default=False)
 @click.option('--epochs', default=50)
-'''
+
 def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
     train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
     train_dataset = train_dataset.batch(batch_size)
@@ -245,4 +245,4 @@ def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
 
 
 if __name__ == '__main__':
-    main('/Users/johnblue/modeltest_training.h5', '/Users/johnblue/modeltest_validation.h5', overlap=7, batch_size=20, use_gpu=False, epochs=10)
+    main()
