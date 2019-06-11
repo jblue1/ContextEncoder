@@ -189,6 +189,8 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
         train_disc_loss = 0
         val_gen_loss = 0
         val_disc_loss = 0
+        count_train = 0
+        count_val = 0
         for image_batch, center_batch in train_dataset:
             if use_gpu:
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
@@ -196,6 +198,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
             gen_loss, disc_loss = take_step(image_batch, center_batch, overlap, use_gpu)
             train_gen_loss += gen_loss
             train_disc_loss += disc_loss
+            count_train += 1
 
         for image_batch, center_batch in val_dataset:
             if use_gpu:
@@ -204,11 +207,16 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
             gen_loss, disc_loss = take_step(image_batch, center_batch, overlap, use_gpu, training=False)
             val_gen_loss += gen_loss
             val_disc_loss += disc_loss
+            count_val += 1
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
             save_pictures(image_batch, center_batch, epoch, use_gpu, './images')
 
+        train_gen_loss = train_gen_loss / count_train
+        train_disc_loss = train_disc_loss / count_train
+        val_gen_loss = val_gen_loss / count_val
+        val_disc_loss = val_disc_loss / count_val
 
         list_train_gen_loss.append(train_gen_loss)
         list_train_disc_loss.append(train_disc_loss)
@@ -229,19 +237,14 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 @click.option('--batch_size', default=64)
 @click.option('--use_gpu/--no_gpu', default=False)
 @click.option('--epochs', default=50)
-
 def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
     train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
     train_dataset = train_dataset.batch(batch_size)
 
     val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap)
     val_dataset = val_dataset.batch(batch_size)
-    if use_gpu:
-        gpu = input('Choose GPU to use:')
-        with tf.device('/GPU:{}'.format(gpu)):
-            train(train_dataset, val_dataset, epochs, overlap, use_gpu)
-    else:
-        train(train_dataset, val_dataset, epochs, overlap, use_gpu)
+
+    train(train_dataset, val_dataset, epochs, overlap, use_gpu)
 
 
 if __name__ == '__main__':
