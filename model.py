@@ -36,7 +36,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
-    encoder_output = tf.keras.layers.Conv2D(filters=4000, kernel_size=4)(x)
+    encoder_output = tf.keras.layers.Conv2D(filters=4000, kernel_size=4, data_format=data_format)(x)
 
     x = tf.keras.layers.Conv2D(filters=4000, kernel_size=1, strides=1, data_format=data_format)(encoder_output)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
@@ -111,9 +111,3 @@ def build_discriminator(channels=3, height=64, width=64, use_gpu=False):
 
     return discriminator
 
-def main():
-    discriminator = build_discriminator()
-    discriminator.summary()
-
-if __name__ == '__main__':
-    main()
