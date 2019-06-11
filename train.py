@@ -15,8 +15,8 @@ import click
 # Build models, define losses and optimizers
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 MSE = tf.keras.losses.MeanSquaredError()
-generator = model.build_autoencoder(True)
-discriminator = model.build_discriminator(True)
+generator = model.build_autoencoder(False)
+discriminator = model.build_discriminator(False)
 generator_optimizer = tf.keras.optimizers.Adam(2e-2)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-3)
 
@@ -137,6 +137,30 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss):
     plt.show()
 
 
+def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, num_pictures=5):
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    gen_centers = (generator(image_batch, training=False) + 1) / 2
+    center_batch = (center_batch + 1) / 2
+
+    if use_gpu:
+        center_batch = tf.transpose(center_batch, (0, 2, 3, 1))
+        gen_centers = tf.transpose(gen_centers, (0, 2, 3, 1))
+
+    for i in range(num_pictures):
+        filename = os.path.join(save_dir, 'epoch_{}_{}'.format(epoch, i) + '.png')
+        fig, (ax1, ax2) = plt.subplots(2)
+        fig.suptitle('Epoch: {}'.format(epoch))
+        ax1.imshow(gen_centers[i, :, :, :])
+        ax1.set_title('Generated Center')
+        ax2.imshow(center_batch[i, :, :, :])
+        ax2.set_title('Real Center')
+        plt.savefig(filename)
+
+
+
 '''
 Trains model, saves a model checkpoint every 5 epochs, and plots a graph of training and validation loss for both
 the autoencoder and discriminator after training. 
@@ -181,31 +205,10 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
             val_gen_loss += gen_loss
             val_disc_loss += disc_loss
 
-        if (epoch + 1) % 5 == 0:
+        if (epoch + 1) % 5 == 0 or epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
-            test_image = image_batch[0:1, :, :, :]
-            gen_center = generator(test_image, training=False)[0, :, :, :]
-            test_image = test_image[0, :, :, :]
-            test_center = center_batch[0, :, :, :]
-            if use_gpu:
-                test_image = tf.transpose(test_image, (1, 2, 0))
-                gen_center = tf.transpose(gen_center, (1, 2, 0))
-                test_center = tf.transpose(test_center, (1, 2, 0))
-            gen_center = (gen_center + 1) / 2
-            test_image = (test_image + 1) / 2
-            test_center = (test_center + 1) / 2
-            plt.imshow(test_image)
-            plt.title('Image. Epoch {}'.format(epoch))
-            plt.savefig('Image. Epoch_{}.png'.format(epoch))
-            plt.show()
-            plt.imshow(test_center)
-            plt.title('Center. Epoch {}'.format(epoch))
-            plt.savefig('Center. Epoch_{}.png'.format(epoch))
-            plt.show()
-            plt.imshow(gen_center)
-            plt.title('Generated Center. Epoch: {}'.format(epoch))
-            plt.savefig('Generated Center. Epoch_{}.png'.format(epoch))
-            plt.show()
+            save_pictures(image_batch, center_batch, epoch, use_gpu, './images')
+
 
         list_train_gen_loss.append(train_gen_loss)
         list_train_disc_loss.append(train_disc_loss)
@@ -218,7 +221,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 
     plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss)
 
-
+'''
 @click.command()
 @click.argument('train_data_path', type=click.Path(exists=True, readable=True))
 @click.argument('val_data_path', type=click.Path(exists=True))
@@ -226,6 +229,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 @click.option('--batch_size', default=64)
 @click.option('--use_gpu/--no_gpu', default=False)
 @click.option('--epochs', default=50)
+'''
 def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
     train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
     train_dataset = train_dataset.batch(batch_size)
@@ -241,4 +245,4 @@ def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
 
 
 if __name__ == '__main__':
-    main()
+    main('/Users/johnblue/modeltest_training.h5', '/Users/johnblue/modeltest_validation.h5', overlap=7, batch_size=20, use_gpu=False, epochs=10)
