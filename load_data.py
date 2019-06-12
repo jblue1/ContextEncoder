@@ -27,9 +27,17 @@ def mask_image(image, mask_size, overlap):
     start_index = int(height - mask_size * 1.5)
     end_index = int(start_index + mask_size)
     center = image[start_index:end_index, start_index:end_index, :]
-    zeros = np.zeros([mask_size-overlap*2, mask_size-overlap*2, channels])
+    # magic numbers come from paper
+    channel_zero = np.empty([mask_size-overlap*2, mask_size-overlap*2]).fill(2*117/255 - 1)
+    channel_one = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
+    channel_two = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
+    fill = np.zeros([mask_size-overlap*2, mask_size-overlap*2, channels])
+    #fill[:, :, 0] = channel_zero
+    #fill[:, :, 1] = channel_one
+    #fill[:, :, 2] = channel_two
+
     masked_image = np.copy(image)
-    masked_image[start_index + overlap:end_index-overlap, start_index+overlap:end_index-overlap, :] = zeros
+    masked_image[start_index + overlap:end_index-overlap, start_index+overlap:end_index-overlap, :] = fill
 
     return center, masked_image
 
@@ -41,7 +49,7 @@ file_path - path to .h5 file with images
 '''
 
 
-def load_h5_to_dataset(file_path, overlap, height=128, width=128, num_channels=3):
+def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_channels=3):
     with h5py.File(file_path) as f:
         list = []
         for i in range(len(f.keys())):
@@ -78,6 +86,9 @@ def load_h5_to_dataset(file_path, overlap, height=128, width=128, num_channels=3
 
     image_dataset = tf.data.Dataset.from_tensor_slices(np.float32(data_images))
     center_dataset = tf.data.Dataset.from_tensor_slices(np.float32(data_centers))
+    # will do one run with the labels shuffled and then compare with not shuffled, to see if model is learning at all
+    if shuffle:
+        center_dataset = center_dataset.shuffle()
     dataset = tf.data.Dataset.zip((image_dataset, center_dataset))
 
     return dataset

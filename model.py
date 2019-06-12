@@ -22,8 +22,10 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                strides=2,
                                padding='same',
                                data_format=data_format)(encoder_input)
+
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
+
     x = tf.keras.layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
@@ -32,13 +34,14 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.Conv2D(filters=256, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
+    # when used initializations of the center from the paper, started getting nans as the output of the layer below
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
-    encoder_output = tf.keras.layers.Conv2D(filters=100, kernel_size=4, data_format=data_format)(x)
+    x = tf.keras.layers.Conv2D(filters=100, kernel_size=4, data_format=data_format)(x)
 
-    x = tf.keras.layers.BatchNormalization(axis)(encoder_output)
+    x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
 
     x = tf.keras.layers.Conv2DTranspose(filters=512, kernel_size=4, data_format=data_format)(x)
@@ -71,6 +74,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                                      padding='same',
                                                      activation='tanh',
                                                      data_format=data_format)(x)
+
     autoencoder = tf.keras.Model(encoder_input, decoder_output, name='autoencoder')
 
     return autoencoder

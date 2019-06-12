@@ -12,12 +12,14 @@ import time
 import click
 
 # Build models, define losses and optimizers
-cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-MSE = tf.keras.losses.MeanSquaredError()
-generator = model.build_autoencoder(False)
-discriminator = model.build_discriminator(False)
-generator_optimizer = tf.keras.optimizers.Adam(2e-2)
-discriminator_optimizer = tf.keras.optimizers.Adam(2e-3)
+lr = 2e-4
+cross_entropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE,
+                                                   from_logits=True)
+MSE = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
+generator = model.build_autoencoder(True)
+discriminator = model.build_discriminator(True)
+generator_optimizer = tf.keras.optimizers.Adam(lr * 10, beta_1=0.5)
+discriminator_optimizer = tf.keras.optimizers.Adam(lr, beta_1=0.5)
 
 '''
 Defines the discriminator loss as the sum of
@@ -90,33 +92,49 @@ to increase speed.
 
 images - tensor containing images to train with
 real_centers - tensor containing the real image centers 
-overlap - integer specifying the number of pixels to overlap the outside image with the center 
-training - if true, applied backprop to network, if false, just takes a forward pass. 
+overlap - integer specifying the number of pixels to overlap the outside image with the center  
 '''
 
 
 @tf.function
-def take_step(images, real_centers, overlap, use_gpu, training=True):
-    with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        generated_centers = generator(images, training=training)
-
-        real_output = discriminator(real_centers, training=training)
-        fake_output = discriminator(generated_centers, training=training)
-
-        gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
+def take_step(images, real_centers, overlap, use_gpu):
+    # 'fDx' in paper, train the discriminator
+    with tf.GradientTape() as disc_tape:
+        real_output = discriminator(real_centers, training=True)
+        generated_centers = generator(images, training=False)
+        fake_output = discriminator(generated_centers, training=True)
         disc_loss = discriminator_loss(real_output, fake_output)
 
-    if training:
-        generator_grads = gen_tape.gradient(gen_loss, generator.trainable_variables)
-        discriminator_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+    discriminator_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+    discriminator_optimizer.apply_gradients(zip(discriminator_grads, discriminator.trainable_variables))
 
-        generator_optimizer.apply_gradients(zip(generator_grads, generator.trainable_variables))
-        discriminator_optimizer.apply_gradients(zip(discriminator_grads, discriminator.trainable_variables))
+    # 'fGx' in paper, train the generator
+    with tf.GradientTape() as gen_tape:
+        generated_centers = generator(images, training=True)
+        gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
+
+    generator_grads = gen_tape.gradient(gen_loss, generator.trainable_variables)
+    generator_optimizer.apply_gradients(zip(generator_grads, generator.trainable_variables))
 
     return gen_loss, disc_loss
 
 
-def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss):
+'''
+Calculates losses without training
+'''
+@tf.function
+def calc_losses(images, real_centers, overlap, use_gpu):
+    generated_centers = generator(images, training=False)
+    real_output = discriminator(real_centers, training=False)
+    fake_output = discriminator(generated_centers, training=False)
+
+    disc_loss = discriminator_loss(real_output, fake_output)
+    gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
+
+    return gen_loss, disc_loss
+
+
+def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuffle):
     fig, (ax1, ax2) = plt.subplots(2, 1)
     ax1.plot(train_gen_loss, color='r', label='Training Loss')
     ax1.plot(val_gen_loss, color='b', label='Validation Loss')
@@ -131,11 +149,14 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss):
     ax2.set_ylabel('Loss')
     ax2.set_title('Discriminator Loss')
     ax2.legend()
-    plt.savefig('Loss_history.png')
-    plt.show()
+    if shuffle:
+        plt.savefig('Loss_history_shuffled_labels.png')
+    else:
+        plt.savefig('Loss_history.png')
+    plt.close()
 
 
-def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, num_pictures=5):
+def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, num_pictures=5):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -147,7 +168,10 @@ def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, num_pictu
         gen_centers = tf.transpose(gen_centers, (0, 2, 3, 1))
 
     for i in range(num_pictures):
-        filename = os.path.join(save_dir, 'epoch_{}_{}'.format(epoch, i) + '.png')
+        if shuffle:
+            filename = os.path.join(save_dir, 'shuffle_epoch_{}_{}'.format(epoch, i) + '.png')
+        else:
+            filename = os.path.join(save_dir, 'epoch_{}_{}'.format(epoch, i) + '.png')
         fig, (ax1, ax2) = plt.subplots(2)
         fig.suptitle('Epoch: {}'.format(epoch))
         ax1.imshow(gen_centers[i, :, :, :])
@@ -155,6 +179,7 @@ def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, num_pictu
         ax2.imshow(center_batch[i, :, :, :])
         ax2.set_title('Real Center')
         plt.savefig(filename)
+        plt.close()
 
 
 '''
@@ -167,7 +192,7 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 '''
 
 
-def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
+def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle):
     checkpoint_dir = './training_checkpoints'
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
@@ -199,14 +224,14 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
             if use_gpu:
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
                 center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            gen_loss, disc_loss = take_step(image_batch, center_batch, overlap, use_gpu, training=False)
+            gen_loss, disc_loss = calc_losses(image_batch, center_batch, overlap, use_gpu)
             val_gen_loss += gen_loss
             val_disc_loss += disc_loss
             count_val += 1
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
-            # save_pictures(image_batch, center_batch, epoch, use_gpu, './images')
+            save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, './images')
 
         train_gen_loss = train_gen_loss / count_train
         train_disc_loss = train_disc_loss / count_train
@@ -222,7 +247,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
         print('Generator - Training loss {} --- Validation loss {}'.format(train_gen_loss, val_gen_loss))
         print('Discriminator - Training loss {} --- Validation loss {} \n'.format(train_disc_loss, val_disc_loss))
 
-    plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss)
+    plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss, shuffle)
 
 
 @click.command()
@@ -232,14 +257,15 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 @click.option('--batch_size', default=64)
 @click.option('--use_gpu/--no_gpu', default=False)
 @click.option('--epochs', default=50)
-def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, epochs):
-    train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap)
+@click.option('--shuffle/--no_shuffle', default=False)
+def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, epochs):
+    train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap, shuffle)
     train_dataset = train_dataset.batch(batch_size)
 
-    val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap)
+    val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap, shuffle)
     val_dataset = val_dataset.batch(batch_size)
 
-    train(train_dataset, val_dataset, epochs, overlap, use_gpu)
+    train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle)
 
 
 if __name__ == '__main__':
