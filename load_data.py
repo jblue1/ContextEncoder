@@ -28,9 +28,9 @@ def mask_image(image, mask_size, overlap):
     end_index = int(start_index + mask_size)
     center = image[start_index:end_index, start_index:end_index, :]
     # magic numbers come from paper
-    channel_zero = np.empty([mask_size-overlap*2, mask_size-overlap*2]).fill(2*117/255 - 1)
-    channel_one = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
-    channel_two = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
+    #channel_zero = np.empty([mask_size-overlap*2, mask_size-overlap*2]).fill(2*117/255 - 1)
+    #channel_one = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
+    #channel_two = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
     fill = np.zeros([mask_size-overlap*2, mask_size-overlap*2, channels])
     #fill[:, :, 0] = channel_zero
     #fill[:, :, 1] = channel_one
@@ -75,11 +75,15 @@ def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_c
                     for j in range(3):
                         g[:, :, j] = layer
                 g = skimage.transform.resize(g, (height, width))
-
+                if g.shape[2] > 3:
+                    g = g[:, :, 0:2]
+                    print('Had an image with 4 channels')
                 centers, images = mask_image(g, int(height/2), overlap)
                 data_images[count, :, :, :] = images * 2 - 1  # normalize pixels to [-1,1]
                 data_centers[count, :, :, :] = centers * 2 - 1
                 count += 1
+                if i % 1000 == 0:
+                    print('Loaded {} images'.format(i))
 
             except KeyError:
                 pass
