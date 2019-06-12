@@ -3,7 +3,6 @@ Trains a context-encoder network to perform image inpainting as described in 'Co
 Inpainting' by Pathak et al. Note that 'generator' and 'autoencoder' are the same thing and used interchangeably.
 '''
 
-
 import tensorflow as tf
 import model
 import load_data
@@ -32,7 +31,6 @@ generator
 
 
 def discriminator_loss(real_output, fake_output):
-
     real_loss = cross_entropy(tf.ones_like(real_output), real_output)
     fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
     total_loss = real_loss + fake_loss
@@ -75,13 +73,13 @@ def generator_loss(fake_output, y_true, y_pred, overlap, use_gpu, weight_l2=0.9,
             y_pred_overlap_right = y_pred[:, -overlap:, -overlap:, :]
 
         center_loss = MSE(y_true_center, y_pred_center)
-        overlap_loss = 10 * (MSE(y_true_overlap_left, y_pred_overlap_left)
-                                                                    + MSE(y_true_overlap_right, y_pred_overlap_right))
+        overlap_loss = 10 * (
+                    MSE(y_true_overlap_left, y_pred_overlap_left) + MSE(y_true_overlap_right, y_pred_overlap_right))
         l2_loss = center_loss + overlap_loss
     else:
 
         l2_loss = MSE(y_true, y_pred)
-    total_loss = weight_adv*adv_loss + weight_l2*l2_loss
+    total_loss = weight_adv * adv_loss + weight_l2 * l2_loss
     return total_loss
 
 
@@ -95,14 +93,15 @@ real_centers - tensor containing the real image centers
 overlap - integer specifying the number of pixels to overlap the outside image with the center 
 training - if true, applied backprop to network, if false, just takes a forward pass. 
 '''
+
+
 @tf.function
 def take_step(images, real_centers, overlap, use_gpu, training=True):
-
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         generated_centers = generator(images, training=training)
 
         real_output = discriminator(real_centers, training=training)
-        fake_output= discriminator(generated_centers, training=training)
+        fake_output = discriminator(generated_centers, training=training)
 
         gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
         disc_loss = discriminator_loss(real_output, fake_output)
@@ -113,7 +112,6 @@ def take_step(images, real_centers, overlap, use_gpu, training=True):
 
         generator_optimizer.apply_gradients(zip(generator_grads, generator.trainable_variables))
         discriminator_optimizer.apply_gradients(zip(discriminator_grads, discriminator.trainable_variables))
-        print('took step')
 
     return gen_loss, disc_loss
 
@@ -138,7 +136,6 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss):
 
 
 def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, num_pictures=5):
-
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -160,7 +157,6 @@ def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, num_pictu
         plt.savefig(filename)
 
 
-
 '''
 Trains model, saves a model checkpoint every 5 epochs, and plots a graph of training and validation loss for both
 the autoencoder and discriminator after training. 
@@ -172,7 +168,6 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 
 
 def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
-
     checkpoint_dir = './training_checkpoints'
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
@@ -211,7 +206,7 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu):
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
-            save_pictures(image_batch, center_batch, epoch, use_gpu, './images')
+            # save_pictures(image_batch, center_batch, epoch, use_gpu, './images')
 
         train_gen_loss = train_gen_loss / count_train
         train_disc_loss = train_disc_loss / count_train
