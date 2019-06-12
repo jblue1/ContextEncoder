@@ -90,15 +90,15 @@ def build_discriminator(use_gpu, channels=3, height=64, width=64):
                                kernel_size=4,
                                strides=2,
                                padding='same',
-                               data_format=data_format, name='D1')(discriminator_inputs)
+                               data_format=data_format)(discriminator_inputs)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
-    x = tf.keras.layers.Conv2D(filters=128, kernel_size=4, strides=2, padding='same', data_format=data_format, name='D2')(x)
+    x = tf.keras.layers.Conv2D(filters=128, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
-    x = tf.keras.layers.Conv2D(filters=256, kernel_size=4, strides=2, padding='same', data_format=data_format, name='D3')(x)
+    x = tf.keras.layers.Conv2D(filters=256, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
-    x = tf.keras.layers.Conv2D(filters=512, kernel_size=4, strides=2, padding='same', data_format=data_format, name='D4')(x)
+    x = tf.keras.layers.Conv2D(filters=512, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=4, data_format=data_format)(x)
@@ -110,10 +110,3 @@ def build_discriminator(use_gpu, channels=3, height=64, width=64):
     return discriminator
 
 
-def main():
-    auto = build_discriminator(True)
-    auto.summary()
-
-
-if __name__ == '__main__':
-    main()
