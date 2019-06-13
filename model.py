@@ -39,7 +39,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
-    x = tf.keras.layers.Conv2D(filters=100, kernel_size=4, data_format=data_format)(x)
+    x = tf.keras.layers.Conv2D(filters=1000, kernel_size=4, data_format=data_format)(x)
 
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
