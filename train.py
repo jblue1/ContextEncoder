@@ -6,6 +6,7 @@ Inpainting' by Pathak et al. Note that 'generator' and 'autoencoder' are the sam
 import tensorflow as tf
 import model
 import load_data
+import load_colors
 import os
 import matplotlib.pyplot as plt
 import time
@@ -323,10 +324,10 @@ def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, 
     write_info_file(info_file, train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, epochs, lr,
                     run_number)
 
-    train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap, shuffle)
+    train_dataset = load_colors.load_colors(100, overlap)
     train_dataset = train_dataset.batch(batch_size)
 
-    val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap, shuffle)
+    val_dataset = load_colors.load_colors(20, overlap)
     val_dataset = val_dataset.batch(batch_size)
 
     train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle, lr, save_dir)
