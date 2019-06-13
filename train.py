@@ -14,8 +14,8 @@ import click
 from datetime import date
 
 # Build models, define losses and optimizers
-# cross_entropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE,
-                                                  # from_logits=True)
+cross_entropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE,
+                                                   from_logits=True)
 
 MSE = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
 
@@ -29,13 +29,13 @@ fake_output: tensor of shape (batch_size, 1, 1, 1) - the discriminators predicti
 generator
 '''
 
-'''
+
 def discriminator_loss(real_output, fake_output):
     real_loss = cross_entropy(tf.ones_like(real_output), real_output)
     fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
     total_loss = real_loss + fake_loss
     return total_loss
-'''
+
 
 '''
 Defines the generator loss as the weighted sum of
@@ -52,9 +52,8 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 '''
 
 
-#def generator_loss(fake_output, y_true, y_pred, overlap, use_gpu, weight_l2=0.9, weight_adv=0.1):
-def generator_loss(y_true, y_pred, overlap, use_gpu, weight_l2=0.9, weight_adv=0.1):
-    # adv_loss = cross_entropy(tf.ones_like(fake_output), fake_output)
+def generator_loss(fake_output, y_true, y_pred, overlap, use_gpu, weight_l2=0.9, weight_adv=0.1):
+    adv_loss = cross_entropy(tf.ones_like(fake_output), fake_output)
     if overlap != 0:
         if use_gpu:
             y_true_center = y_true[:, :, overlap:-overlap, overlap:-overlap]
@@ -80,7 +79,7 @@ def generator_loss(y_true, y_pred, overlap, use_gpu, weight_l2=0.9, weight_adv=0
     else:
 
         l2_loss = MSE(y_true, y_pred)
-    total_loss =  weight_l2 * l2_loss # + weight_adv * adv_loss
+    total_loss =  weight_l2 * l2_loss  + weight_adv * adv_loss
     return total_loss
 
 
@@ -96,11 +95,10 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 
 
 @tf.function
-#def take_step(images, real_centers, overlap, generator, discriminator, use_gpu, generator_optimizer,
-            #  discriminator_optimizer):
-def take_step(images, real_centers, overlap, generator, use_gpu, generator_optimizer):
+def take_step(images, real_centers, overlap, generator, discriminator, use_gpu, generator_optimizer,
+              discriminator_optimizer):
 
-    '''
+
     # 'fDx' in paper, train the discriminator
     with tf.GradientTape() as disc_tape:
         real_output = discriminator(real_centers, training=True)
@@ -110,18 +108,17 @@ def take_step(images, real_centers, overlap, generator, use_gpu, generator_optim
 
     discriminator_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
     discriminator_optimizer.apply_gradients(zip(discriminator_grads, discriminator.trainable_variables))
-    '''
+
 
     # 'fGx' in paper, train the generator
     with tf.GradientTape() as gen_tape:
         generated_centers = generator(images, training=True)
-       # gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
-        gen_loss = generator_loss(real_centers, generated_centers, overlap, use_gpu)
+        gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
 
     generator_grads = gen_tape.gradient(gen_loss, generator.trainable_variables)
     generator_optimizer.apply_gradients(zip(generator_grads, generator.trainable_variables))
 
-    return gen_loss# , disc_loss
+    return gen_loss, disc_loss
 
 
 '''
@@ -130,20 +127,18 @@ Calculates losses without training
 
 
 @tf.function
-def calc_losses(images, real_centers, overlap, use_gpu, generator):#, discriminator):
+def calc_losses(images, real_centers, overlap, use_gpu, generator, discriminator):
     generated_centers = generator(images, training=False)
-    #real_output = discriminator(real_centers, training=False)
-    #fake_output = discriminator(generated_centers, training=False)
+    real_output = discriminator(real_centers, training=False)
+    fake_output = discriminator(generated_centers, training=False)
 
-    # disc_loss = discriminator_loss(real_output, fake_output)
-   # gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
-    gen_loss = generator_loss(real_centers, generated_centers, overlap, use_gpu)
+    disc_loss = discriminator_loss(real_output, fake_output)
+    gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
 
-    return gen_loss#, disc_loss
+    return gen_loss, disc_loss
 
 
-#def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuffle, save_dir):
-def plot_loss(train_gen_loss, val_gen_loss, shuffle, save_dir):
+def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuffle, save_dir):
     fig, (ax1, ax2) = plt.subplots(2, 1)
     ax1.plot(train_gen_loss, color='r', label='Training Loss')
     ax1.plot(val_gen_loss, color='b', label='Validation Loss')
@@ -151,14 +146,14 @@ def plot_loss(train_gen_loss, val_gen_loss, shuffle, save_dir):
     ax1.set_ylabel('Loss')
     ax1.set_title('Generator Loss')
     ax1.legend()
-    '''
+
     ax2.plot(train_disc_loss, color='r', label='Training Loss')
     ax2.plot(val_disc_loss, color='b', label='Validation Loss')
     ax2.set_xlabel('Num. Epochs')
     ax2.set_ylabel('Loss')
     ax2.set_title('Discriminator Loss')
     ax2.legend()
-    '''
+
     fig.subplots_adjust(hspace=.5)
     if shuffle:
         filename = os.path.join(save_dir, 'Loss_history_shuffled_labels.png')
@@ -206,41 +201,41 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 
 def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle, lr, save_dir):
     generator = model.build_autoencoder(use_gpu)
-    #discriminator = model.build_discriminator(use_gpu)
+    discriminator = model.build_discriminator(use_gpu)
     generator_optimizer = tf.keras.optimizers.Adam(lr * 10)
-    #discriminator_optimizer = tf.keras.optimizers.Adam(lr)
-
+    discriminator_optimizer = tf.keras.optimizers.Adam(lr)
     checkpoint_dir = os.path.join(save_dir, 'training_checkpoints/')
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
-                                    # discriminator_optimizer=discriminator_optimizer,
-                                     generator=generator)
-                                    # discriminator=discriminator)
+                                     discriminator_optimizer=discriminator_optimizer,
+                                     generator=generator,
+                                     discriminator=discriminator)
     list_train_gen_loss = []
-    #list_train_disc_loss = []
+    list_train_disc_loss = []
     list_val_gen_loss = []
-    #list_val_disc_loss = []
+    list_val_disc_loss = []
     for epoch in range(epochs):
         start = time.time()
         train_gen_loss = 0
-        #train_disc_loss = 0
+        train_disc_loss = 0
         val_gen_loss = 0
-        #val_disc_loss = 0
+        val_disc_loss = 0
         count_train = 0
         count_val = 0
         for image_batch, center_batch in train_dataset:
             if use_gpu:
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
                 center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            #gen_loss, disc_loss = take_step(image_batch,
-            gen_loss = take_step(images=image_batch,
-                                            real_centers=center_batch,
-                                            overlap=overlap,
-                                            generator=generator,
-                                            use_gpu=use_gpu,
-                                            generator_optimizer=generator_optimizer)
+            gen_loss, disc_loss = take_step(image_batch,
+                                            center_batch,
+                                            overlap,
+                                            generator,
+                                            discriminator,
+                                            use_gpu,
+                                            generator_optimizer,
+                                            discriminator_optimizer)
             train_gen_loss += gen_loss
-            #train_disc_loss += disc_loss
+            train_disc_loss += disc_loss
             count_train += 1
         if (epoch + 1) % 5 == 0 or epoch == 0:
             save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, 'train')
@@ -248,10 +243,9 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle, lr, sav
             if use_gpu:
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
                 center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            #gen_loss, disc_loss = calc_losses(image_batch, center_batch, overlap, use_gpu, generator, discriminator)
-            gen_loss = calc_losses(image_batch, center_batch, overlap, use_gpu, generator)#, discriminator)
+            gen_loss, disc_loss = calc_losses(image_batch, center_batch, overlap, use_gpu, generator, discriminator)
             val_gen_loss += gen_loss
-            #val_disc_loss += disc_loss
+            val_disc_loss += disc_loss
             count_val += 1
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
@@ -259,21 +253,20 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle, lr, sav
             save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, 'val')
 
         train_gen_loss = train_gen_loss / count_train
-        #train_disc_loss = train_disc_loss / count_train
+        train_disc_loss = train_disc_loss / count_train
         val_gen_loss = val_gen_loss / count_val
-        #val_disc_loss = val_disc_loss / count_val
+        val_disc_loss = val_disc_loss / count_val
 
         list_train_gen_loss.append(train_gen_loss)
-        #list_train_disc_loss.append(train_disc_loss)
+        list_train_disc_loss.append(train_disc_loss)
         list_val_gen_loss.append(val_gen_loss)
-        #list_val_disc_loss.append(val_disc_loss)
+        list_val_disc_loss.append(val_disc_loss)
 
         print('Time for epoch {} is {} sec'.format(epoch + 1, time.time() - start))
         print('Generator - Training loss {} --- Validation loss {}'.format(train_gen_loss, val_gen_loss))
-       # print('Discriminator - Training loss {} --- Validation loss {} \n'.format(train_disc_loss, val_disc_loss))
+        print('Discriminator - Training loss {} --- Validation loss {} \n'.format(train_disc_loss, val_disc_loss))
 
-    # plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss, shuffle, save_dir)
-    plot_loss(list_train_gen_loss, list_val_gen_loss, shuffle, save_dir)
+    plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss, shuffle, save_dir)
 
 
 def write_info_file(filename, train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, epochs, lr,
