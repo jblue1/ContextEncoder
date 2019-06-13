@@ -15,11 +15,10 @@ import click
 lr = 2e-4
 cross_entropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE,
                                                    from_logits=True)
+
 MSE = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
-generator = model.build_autoencoder(True)
-discriminator = model.build_discriminator(True)
-generator_optimizer = tf.keras.optimizers.Adam(lr * 10, beta_1=0.5)
-discriminator_optimizer = tf.keras.optimizers.Adam(lr, beta_1=0.5)
+generator_optimizer = tf.keras.optimizers.Adam(lr * 10)
+discriminator_optimizer = tf.keras.optimizers.Adam(lr)
 
 '''
 Defines the discriminator loss as the sum of
@@ -97,7 +96,7 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 
 
 @tf.function
-def take_step(images, real_centers, overlap, use_gpu):
+def take_step(images, real_centers, overlap, generator, discriminator, use_gpu):
     # 'fDx' in paper, train the discriminator
     with tf.GradientTape() as disc_tape:
         real_output = discriminator(real_centers, training=True)
@@ -123,7 +122,7 @@ def take_step(images, real_centers, overlap, use_gpu):
 Calculates losses without training
 '''
 @tf.function
-def calc_losses(images, real_centers, overlap, use_gpu):
+def calc_losses(images, real_centers, overlap, use_gpu, generator, discriminator):
     generated_centers = generator(images, training=False)
     real_output = discriminator(real_centers, training=False)
     fake_output = discriminator(generated_centers, training=False)
@@ -149,6 +148,7 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuf
     ax2.set_ylabel('Loss')
     ax2.set_title('Discriminator Loss')
     ax2.legend()
+    fig.subplots_adjust(hspace=.5)
     if shuffle:
         plt.savefig('Loss_history_shuffled_labels.png')
     else:
@@ -156,7 +156,7 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuf
     plt.close()
 
 
-def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, num_pictures=5):
+def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, num_pictures=5):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -178,6 +178,7 @@ def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, 
         ax1.set_title('Generated Center')
         ax2.imshow(center_batch[i, :, :, :])
         ax2.set_title('Real Center')
+        fig.subplots_adjust(hspace=.3)
         plt.savefig(filename)
         plt.close()
 
@@ -193,6 +194,9 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 
 
 def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle):
+    generator = model.build_autoencoder(use_gpu)
+    discriminator = model.build_discriminator(use_gpu)
+
     checkpoint_dir = './training_checkpoints'
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
@@ -215,7 +219,12 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle):
             if use_gpu:
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
                 center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            gen_loss, disc_loss = take_step(image_batch, center_batch, overlap, use_gpu)
+            gen_loss, disc_loss = take_step(image_batch,
+                                            center_batch,
+                                            overlap,
+                                            generator,
+                                            discriminator,
+                                            use_gpu)
             train_gen_loss += gen_loss
             train_disc_loss += disc_loss
             count_train += 1
@@ -224,14 +233,14 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle):
             if use_gpu:
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
                 center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            gen_loss, disc_loss = calc_losses(image_batch, center_batch, overlap, use_gpu)
+            gen_loss, disc_loss = calc_losses(image_batch, center_batch, overlap, use_gpu, generator, discriminator)
             val_gen_loss += gen_loss
             val_disc_loss += disc_loss
             count_val += 1
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
-            save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, './images')
+            save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, './images', generator)
 
         train_gen_loss = train_gen_loss / count_train
         train_disc_loss = train_disc_loss / count_train

@@ -8,7 +8,6 @@ import h5py
 import numpy as np
 import tensorflow as tf
 import skimage
-import matplotlib.pyplot as plt
 
 
 '''
@@ -27,15 +26,7 @@ def mask_image(image, mask_size, overlap):
     start_index = int(height - mask_size * 1.5)
     end_index = int(start_index + mask_size)
     center = image[start_index:end_index, start_index:end_index, :]
-    # magic numbers come from paper
-    #channel_zero = np.empty([mask_size-overlap*2, mask_size-overlap*2]).fill(2*117/255 - 1)
-    #channel_one = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
-    #channel_two = np.empty([mask_size - overlap * 2, mask_size - overlap * 2]).fill(2 * 104 / 255 - 1)
     fill = np.zeros([mask_size-overlap*2, mask_size-overlap*2, channels])
-    #fill[:, :, 0] = channel_zero
-    #fill[:, :, 1] = channel_one
-    #fill[:, :, 2] = channel_two
-
     masked_image = np.copy(image)
     masked_image[start_index + overlap:end_index-overlap, start_index+overlap:end_index-overlap, :] = fill
 
@@ -58,7 +49,6 @@ def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_c
                 g = np.asarray(f[name])
                 list.append(i)
             except KeyError:
-                #print('img_{} does not exist'.format(i))
                 pass
         data_images = np.empty((len(list), height, width, num_channels))
         data_centers = np.empty((len(list), int(height/2), int(width/2), num_channels))
@@ -92,7 +82,7 @@ def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_c
     center_dataset = tf.data.Dataset.from_tensor_slices(np.float32(data_centers))
     # will do one run with the labels shuffled and then compare with not shuffled, to see if model is learning at all
     if shuffle:
-        center_dataset = center_dataset.shuffle()
+        center_dataset = center_dataset.shuffle(len(list))
     dataset = tf.data.Dataset.zip((image_dataset, center_dataset))
 
     return dataset
