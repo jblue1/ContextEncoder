@@ -35,18 +35,13 @@ def load_colors(num_images, overlap):
 
         for j in range(3):
             background_color = random.random()
-            line_color = random.random()
-
-            # decides whether the line is vertical or horizontal
-            if random.random() < 0.5:
-                image[:vert_start_index, :, j].fill(background_color)
-                image[vert_start_index:vert_end_index, :, j].fill(line_color)
-                image[vert_end_index:, :, j].fill(background_color)
-            else:
-                image[:, :horiz_start_index, j].fill(background_color)
-                image[:, horiz_start_index:horiz_end_index, j].fill(line_color)
-                image[:, horiz_end_index:, j].fill(background_color)
-
+            image[:, :, j].fill(background_color)
+        line_color = 0.3
+        # decides whether the line is vertical or horizontal
+        if random.random() < 0.5:
+            image[vert_start_index:vert_end_index, :, :].fill(line_color)
+        else:
+            image[:, horiz_start_index:horiz_end_index, :].fill(line_color)
         zeros = np.zeros([64-overlap*2, 64-overlap*2, 3])
         center = image[32:96, 32:96, :]
         center = np.copy(center)
