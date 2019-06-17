@@ -98,7 +98,6 @@ overlap - integer specifying the number of pixels to overlap the outside image w
 def take_step(images, real_centers, overlap, generator, discriminator, use_gpu, generator_optimizer,
               discriminator_optimizer):
 
-
     # 'fDx' in paper, train the discriminator
     with tf.GradientTape() as disc_tape:
         real_output = discriminator(real_centers, training=True)
@@ -108,7 +107,6 @@ def take_step(images, real_centers, overlap, generator, discriminator, use_gpu, 
 
     discriminator_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
     discriminator_optimizer.apply_gradients(zip(discriminator_grads, discriminator.trainable_variables))
-
 
     # 'fGx' in paper, train the generator
     with tf.GradientTape() as gen_tape:
@@ -167,7 +165,6 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuf
 def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, type, num_pictures=5):
     gen_centers = (generator(image_batch, training=False) + 1) / 2
     center_batch = (center_batch + 1) / 2
-
 
     if use_gpu:
         center_batch = tf.transpose(center_batch, (0, 2, 3, 1))
@@ -317,10 +314,10 @@ def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, 
     write_info_file(info_file, train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, epochs, lr,
                     run_number)
 
-    train_dataset = load_colors.load_colors(100, overlap)
+    train_dataset = load_colors.load_colors(10000, overlap)
     train_dataset = train_dataset.batch(batch_size)
 
-    val_dataset = load_colors.load_colors(20, overlap)
+    val_dataset = load_colors.load_colors(2000, overlap)
     val_dataset = val_dataset.batch(batch_size)
 
     train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle, lr, save_dir)
