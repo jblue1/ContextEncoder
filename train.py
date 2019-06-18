@@ -1,6 +1,7 @@
 '''
 Trains a context-encoder network to perform image inpainting as described in 'Context Encoders: Feature Learning by
-Inpainting' by Pathak et al. Note that 'generator' and 'autoencoder' are the same thing and used interchangeably.
+Inpainting' by Pathak et al. Note that 'generator' and 'autoencoder' are the same thing and the terms used
+interchangeably.
 '''
 
 import tensorflow as tf
@@ -162,7 +163,7 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuf
     plt.close()
 
 
-def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, type, num_pictures=5):
+def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, type, num_pictures=1):
     gen_centers = (generator(image_batch, training=False) + 1) / 2
     center_batch = (center_batch + 1) / 2
 
@@ -285,7 +286,7 @@ def write_info_file(filename, train_data_path, val_data_path, overlap, batch_siz
 
 @click.command()
 @click.argument('train_data_path', type=click.Path(exists=True, readable=True))
-@click.argument('val_data_path', type=click.Path(exists=True))
+@click.argument('val_data_path', type=click.Path())
 @click.option('--overlap', default=7, help='Size of overlap (in pixels) the predicted image in the real image')
 @click.option('--batch_size', default=64)
 @click.option('--use_gpu/--no_gpu', default=False)
@@ -314,10 +315,16 @@ def main(train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, 
     write_info_file(info_file, train_data_path, val_data_path, overlap, batch_size, use_gpu, shuffle, epochs, lr,
                     run_number)
 
-    train_dataset = load_colors.load_colors(10000, overlap)
-    train_dataset = train_dataset.batch(batch_size)
+    #train_dataset = load_data.load_h5_to_dataset(train_data_path, overlap, shuffle)
+    #train_dataset = load_colors.load_colors(10000, overlap)
+    #train_dataset = train_dataset.batch(batch_size)
 
-    val_dataset = load_colors.load_colors(2000, overlap)
+    #val_dataset = load_data.load_h5_to_dataset(val_data_path, overlap, shuffle)
+    #val_dataset = load_colors.load_colors(2000, overlap)
+    #val_dataset = val_dataset.batch(batch_size)
+
+    train_dataset, val_dataset = load_data.load_simulated_data(train_data_path)
+    train_dataset = train_dataset.batch(batch_size)
     val_dataset = val_dataset.batch(batch_size)
 
     train(train_dataset, val_dataset, epochs, overlap, use_gpu, shuffle, lr, save_dir)
