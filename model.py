@@ -61,6 +61,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                         data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.ReLU()(x)
+    '''
     x = tf.keras.layers.Conv2DTranspose(filters=64,
                                         kernel_size=4,
                                         strides=2,
@@ -68,6 +69,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                         data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.ReLU()(x)
+    '''
     decoder_output = tf.keras.layers.Conv2DTranspose(filters=3,
                                                      kernel_size=4,
                                                      strides=2,
@@ -80,7 +82,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
     return autoencoder
 
 
-def build_discriminator(use_gpu, channels=3, height=64, width=64):
+def build_discriminator(use_gpu, channels=3, height=32, width=32):
     if use_gpu:
         data_format = 'channels_first'
         axis = 1
@@ -96,9 +98,9 @@ def build_discriminator(use_gpu, channels=3, height=64, width=64):
                                padding='same',
                                data_format=data_format)(discriminator_inputs)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
-    x = tf.keras.layers.Conv2D(filters=128, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
-    x = tf.keras.layers.BatchNormalization(axis)(x)
-    x = tf.keras.layers.LeakyReLU(0.2)(x)
+    #x = tf.keras.layers.Conv2D(filters=128, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
+    #x = tf.keras.layers.BatchNormalization(axis)(x)
+    #x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.Conv2D(filters=256, kernel_size=4, strides=2, padding='same', data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
