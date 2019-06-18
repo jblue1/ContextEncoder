@@ -163,9 +163,11 @@ def plot_loss(train_gen_loss, val_gen_loss, train_disc_loss, val_disc_loss, shuf
     plt.close()
 
 
-def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, type, num_pictures=1):
+def save_pictures(image_batch, center_batch, epoch, shuffle, use_gpu, save_dir, generator, type, num_pictures=5):
     gen_centers = (generator(image_batch, training=False) + 1) / 2
     center_batch = (center_batch + 1) / 2
+    if len(image_batch) < num_pictures:
+        num_pictures = 1
 
     if use_gpu:
         center_batch = tf.transpose(center_batch, (0, 2, 3, 1))

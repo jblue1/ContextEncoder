@@ -22,16 +22,13 @@ and the other for testing
 def choose_images(num_images, read_path, train_percent=0.8, val_percent=0.8):
     urls = []
     with open(read_path) as myfile:
-        lines_from_file = [next(myfile) for _ in range(num_images * 2)]
-
-    count = 0
-    for i in range(num_images * 2):
-        if 'flickr' in lines_from_file[i]:
-            start = lines_from_file[i].find('h')
-            urls.append(lines_from_file[i][start:-1])
-            count += 1
-        if count >= num_images:
-            break
+        count = 0
+        while count < num_images:
+            x = next(myfile)
+            if 'flickr' in x:
+                count += 1
+                url = x[x.find('h'):-1]
+                urls.append(url)
 
     np.random.shuffle(urls)
     sep_index1 = int(num_images * train_percent)
