@@ -2,8 +2,7 @@ import tensorflow as tf
 
 
 '''
-Functions to build the autoencoder/generator and discriminator as a keras model objects. Assumes input data is of the dimensions
-(batch_size, height, width, channels). 
+Functions to build the autoencoder/generator and discriminator as a keras model objects. 
 '''
 
 
@@ -115,4 +114,4 @@ def build_discriminator(use_gpu, channels=3, height=32, width=32):
 
     return discriminator
 
-
+# test
