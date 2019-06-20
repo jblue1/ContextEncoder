@@ -114,4 +114,3 @@ def build_discriminator(use_gpu, channels=3, height=32, width=32):
 
     return discriminator
 
-# test
