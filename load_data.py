@@ -1,8 +1,8 @@
-'''
+"""
 Module with functions to take an .h5 file and load them into a zipped tensorflow dataset object
 containing both a dataset with the images needed to be inpainted and a dataset with the real
 center regions.
-'''
+"""
 
 import h5py
 import numpy as np
@@ -10,18 +10,15 @@ import tensorflow as tf
 import skimage
 
 
-'''
-Takes in a numpy representation of an image, and extracts the center
-mask_size x mask_size chunk. Also sets the center region (minus an 
-overlap on each side) to (0,0,0). 
-
-image - numpy representation of an image
-mask_size - size of chunk to extract
- 
-'''
-
-
 def mask_image(image, mask_size, overlap):
+    """
+    Takes in a numpy representation of an image, and extracts the center
+    mask_size x mask_size chunk. Also sets the center region (minus an
+    overlap on each side) to (0,0,0).
+
+    image - numpy representation of an image
+    mask_size - size of chunk to extract
+    """
     height, width, channels = image.shape
     start_index = int(height - mask_size * 1.5)
     end_index = int(start_index + mask_size)
@@ -33,14 +30,12 @@ def mask_image(image, mask_size, overlap):
     return center, masked_image
 
 
-'''
-Takes an .h5 file of images and converts in to a tensorflow dataset object.
-
-file_path - path to .h5 file with images 
-'''
-
-
 def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_channels=3):
+    """
+    Takes an .h5 file of images and converts in to a tensorflow dataset object.
+
+    file_path - path to .h5 file with images
+    """
     with h5py.File(file_path) as f:
         list = []
         for i in range(len(f.keys())):
@@ -84,13 +79,11 @@ def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_c
     return dataset
 
 
-'''
-Takes an .h5 file containing images of simulated AT-TPC proton and carbon events, and returns a training and 
-validation tf dataset object containing the image (128x128x3) and broken image element (32x32x3)
-'''
-
-
 def load_simulated_data(file_path):
+    """
+    Takes an .h5 file containing images of simulated AT-TPC proton and carbon events, and returns a training and
+    validation tf dataset object containing the image (128x128x3) and broken image element (32x32x3)
+    """
     with h5py.File(file_path) as f:
         images = np.asarray(f['train_images'])
         image_contexts = np.asarray(f['train_image_contexts'])
