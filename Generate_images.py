@@ -71,7 +71,6 @@ def simulated(projection, data_dir, save_path, prefix):
     train_images = np.zeros((len(train), 128, 128, 3), dtype=np.uint8)
 
     for i, event in enumerate(train):
-        print(i)
         e = event[0]
         z = e[:, 1]
         c = e[:, 3]
@@ -132,7 +131,6 @@ def simulated(projection, data_dir, save_path, prefix):
     test_images = np.zeros((len(test), 128, 128, 3), dtype=np.uint8)
 
     for i, event in enumerate(test):
-        print(i)
         e = event[0]
         z = e[:, 1]
         c = e[:, 3]
@@ -191,7 +189,6 @@ def simulated(projection, data_dir, save_path, prefix):
     print('Saving file...')
 
     filename = os.path.join(save_path, prefix + 'images.h5')
-    print(len(train_image_contexts))
     # Save to HDF5
     h5 = h5py.File(filename, 'w')
     h5.create_dataset('train_image_contexts', data=train_image_contexts)
@@ -206,12 +203,11 @@ def simulated(projection, data_dir, save_path, prefix):
 @click.command()
 @click.argument('projection', type=click.Choice(['xy', 'zy']), nargs=1)
 @click.argument('data_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True), nargs=1)
-@click.option('--save_dir', type=click.Path(exists=False, file_okay=False, dir_okay=True), default='',
-              help='Where to save the generated data.')
+@click.argument('save_dir', type=click.Path(exists=False, file_okay=False, dir_okay=True), nargs=1)
 @click.option('--num_batches', default=5, help='Number of event batches to load')
-def main(projection, data_dir, save_path, num_batches):
+def main(projection, data_dir, save_dir, num_batches):
     for i in range(num_batches):
-        simulated(projection, data_dir, save_path, 'batch_{}_'.format(i + 1))
+        simulated(projection, data_dir, save_dir, 'batch_{}_'.format(i + 1))
 
 
 if __name__ == '__main__':
