@@ -53,7 +53,7 @@ et al.
 '''
 
 
-def generator_loss(fake_output, y_true, y_pred, overlap, use_gpu, weight_l2=0.9, weight_adv=0.1):
+def generator_loss(fake_output, y_true, y_pred, overlap, use_gpu, weight_l2=0.9, weight_adv=0.1, use_adv=True):
     adv_loss = cross_entropy(tf.ones_like(fake_output), fake_output)
     # isolate overlapped areas of the image
     if overlap != 0:
@@ -82,7 +82,10 @@ def generator_loss(fake_output, y_true, y_pred, overlap, use_gpu, weight_l2=0.9,
     else:
 
         l2_loss = MSE(y_true, y_pred)
-    total_loss =  weight_l2 * l2_loss  + weight_adv * adv_loss
+    if use_adv:
+        total_loss = weight_l2 * l2_loss + weight_adv * adv_loss
+    else:
+        total_loss = l2_loss
     return total_loss
 
 
@@ -97,14 +100,16 @@ real_centers: tensor - real image centers
 
 
 @tf.function
-def take_step(images, real_centers, overlap, generator, discriminator, use_gpu, generator_optimizer,
+def take_step(image_contexts, images, missing_region, overlap, generator, discriminator, use_gpu, generator_optimizer,
               discriminator_optimizer):
-
     # 'fDx' in paper, train the discriminator
     with tf.GradientTape() as disc_tape:
-        real_output = discriminator(real_centers, training=True)
-        generated_centers = generator(images, training=False)
-        fake_output = discriminator(generated_centers, training=True)
+        real_output = discriminator(missing_region, training=True)
+        generated_images = generator(image_contexts, training=False)
+        if use_gpu:
+            fake_output = discriminator(generated_images[:, :, 60:92, 61:93], training=True)
+        else:
+            fake_output = discriminator(generated_images[:, 60:92, 61:93, :], training=True)
         disc_loss = discriminator_loss(real_output, fake_output)
 
     discriminator_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -112,8 +117,8 @@ def take_step(images, real_centers, overlap, generator, discriminator, use_gpu, 
 
     # 'fGx' in paper, train the generator
     with tf.GradientTape() as gen_tape:
-        generated_centers = generator(images, training=True)
-        gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
+        generated_images = generator(image_contexts, training=True)
+        gen_loss = generator_loss(fake_output, images, generated_images, overlap, use_gpu)
 
     generator_grads = gen_tape.gradient(gen_loss, generator.trainable_variables)
     generator_optimizer.apply_gradients(zip(generator_grads, generator.trainable_variables))
@@ -127,15 +132,19 @@ Calculates losses without training
 
 
 @tf.function
-def calc_losses(images, real_centers, overlap, use_gpu, generator, discriminator):
-    generated_centers = generator(images, training=False)
-    real_output = discriminator(real_centers, training=False)
-    fake_output = discriminator(generated_centers, training=False)
+def calc_losses(image_contexts, images, missing_region, overlap, use_gpu, generator, discriminator):
+    generated_images = generator(image_contexts, training=False)
+    real_output = discriminator(missing_region, training=False)
+    if use_gpu:
+        fake_output = discriminator(generated_images[:, :, 60:92, 61:93], training=True)
+    else:
+        fake_output = discriminator(generated_images[:, 60:92, 61:93, :], training=True)
 
     disc_loss = discriminator_loss(real_output, fake_output)
-    gen_loss = generator_loss(fake_output, real_centers, generated_centers, overlap, use_gpu)
+    gen_loss = generator_loss(fake_output, images, generated_images, overlap, use_gpu)
+    l2_gen_loss = generator_loss(fake_output, images, generated_images, overlap, use_gpu, use_adv=False)
 
-    return gen_loss, disc_loss
+    return gen_loss, disc_loss, l2_gen_loss
 
 
 '''
@@ -179,26 +188,31 @@ num_pictures: int - number of images to save
 '''
 
 
-def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, generator, prefix='', num_pictures=5):
+def save_pictures(image_context_batch, missing_region_batch, epoch, use_gpu, save_dir, generator, prefix='',
+                  num_pictures=5):
     # take data from [-1, 1] range to [0, 1] range for plotting
-    gen_centers = (generator(image_batch, training=False) + 1) / 2
-    center_batch = (center_batch + 1) / 2
+    gen_images_batch = (generator(image_context_batch, training=False) + 1) / 2
 
-    if len(image_batch) < num_pictures:
+    if len(image_context_batch) < num_pictures:
         num_pictures = 1
 
     if use_gpu:
-        center_batch = tf.transpose(center_batch, (0, 2, 3, 1))
-        gen_centers = tf.transpose(gen_centers, (0, 2, 3, 1))
+        image_context_batch = tf.transpose(image_context_batch, (0, 2, 3, 1))
+        gen_images_batch = tf.transpose(gen_images_batch, (0, 2, 3, 1))
 
+    gen_missing_region_batch = gen_images_batch[:, 60:92, 61:93, :]
     for i in range(num_pictures):
         filename = os.path.join(save_dir, prefix + '_epoch_{}_{}'.format(epoch, i) + '.png')
-        fig, (ax1, ax2) = plt.subplots(2)
+        fig, axs = plt.subplots(2, 2)
         fig.suptitle('Epoch: {}'.format(epoch))
-        ax1.imshow(gen_centers[i, :, :, :])
-        ax1.set_title('Generated Center')
-        ax2.imshow(center_batch[i, :, :, :])
-        ax2.set_title('Real Center')
+        axs[0, 0].imshow(image_context_batch[i, :, :, :])
+        axs[0, 0].set_title('Image Context')
+        axs[0, 1].imshow(gen_images_batch[i, :, :, :])
+        axs[0, 1].set_title('Generated Image')
+        axs[1, 0].imshow(missing_region_batch[i, :, :, :])
+        axs[1, 0].set_title('Missing Region')
+        axs[1, 1].imshow(gen_missing_region_batch[i, :, :, :])
+        axs[1, 1].set_title('Generated Missing Region')
         fig.subplots_adjust(hspace=.3)
         plt.savefig(filename)
         plt.close()
@@ -207,8 +221,6 @@ def save_pictures(image_batch, center_batch, epoch, use_gpu, save_dir, generator
 '''
 Trains model, saves a model checkpoint every 5 epochs, and plots a graph of training and validation loss for both
 the autoencoder and discriminator after training. 
-
-lr: float - learning rate 
 '''
 
 
@@ -224,29 +236,38 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, lr, save_dir):
                                      generator=generator,
                                      discriminator=discriminator)
     # save pictures using model in its initialized state for comparison
-    image, center = next(iter(train_dataset))
-    print(image[0:1, :, :, :])
-    save_pictures(image[0:1, :, :, :], center[0:1, :, :, :], 0, use_gpu, save_dir, generator, prefix='init')
+    image_context, image = next(iter(train_dataset))
+    missing_region = image[:, 60:92, 61:93, :]
+    if use_gpu:
+        image_context = tf.transpose(image, (0, 3, 1, 2))
+        missing_region = tf.transpose(missing_region, (0, 3, 1, 2))
+    save_pictures(image_context[0:1, :, :, :], missing_region[0:1, :, :, :], 0, use_gpu, save_dir, generator,
+                  prefix='init')
 
     list_train_gen_loss = []
     list_train_disc_loss = []
     list_val_gen_loss = []
     list_val_disc_loss = []
+    list_l2_val_gen_loss = []
     for epoch in range(epochs):
         start = time.time()
         train_gen_loss = 0
         train_disc_loss = 0
         val_gen_loss = 0
         val_disc_loss = 0
+        val_l2_gen_loss = 0
         count_train = 0
         count_val = 0
-        for image_batch, center_batch in train_dataset:
+        for image_context_batch, image_batch in train_dataset:
+            missing_region_batch = image_batch[:, 60:92, 61:93, :]
             # if using gpu need to transpose tensor to channels first
             if use_gpu:
+                image_context_batch = tf.transpose(image_context_batch, (0, 3, 1, 2))
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
-                center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            gen_loss, disc_loss = take_step(image_batch,
-                                            center_batch,
+                missing_region_batch = tf.transpose(missing_region_batch, (0, 3, 1, 2))
+            gen_loss, disc_loss = take_step(image_context_batch,
+                                            image_batch,
+                                            missing_region_batch,
                                             overlap,
                                             generator,
                                             discriminator,
@@ -258,32 +279,40 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, lr, save_dir):
             count_train += 1
         # every 5th epoch (and the first) save training images for comparison
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            save_pictures(image_batch, center_batch, epoch+1, use_gpu, save_dir, generator, prefix='train')
+            save_pictures(image_context_batch, missing_region_batch, epoch + 1, use_gpu, save_dir, generator,
+                          prefix='train')
         for image_batch, center_batch in val_dataset:
+            missing_region_batch = image_batch[:, 60:92, 61:93, :]
             if use_gpu:
+                image_context_batch = tf.transpose(image_context_batch, (0, 3, 1, 2))
                 image_batch = tf.transpose(image_batch, (0, 3, 1, 2))
-                center_batch = tf.transpose(center_batch, (0, 3, 1, 2))
-            gen_loss, disc_loss = calc_losses(image_batch, center_batch, overlap, use_gpu, generator, discriminator)
+                missing_region_batch = tf.transpose(missing_region_batch, (0, 3, 1, 2))
+            gen_loss, disc_loss, l2_gen_loss = calc_losses(image_context_batch, image_batch, missing_region_batch,
+                                                           overlap, use_gpu, generator, discriminator)
             val_gen_loss += gen_loss
             val_disc_loss += disc_loss
+            val_l2_gen_loss += l2_gen_loss
             count_val += 1
 
         # every 5th epoch (and the first) save validation images for comparison and save model checkpoints
         if (epoch + 1) % 5 == 0 or epoch == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
-            save_pictures(image_batch, center_batch, epoch+1, use_gpu, save_dir, generator, prefix='val')
+            save_pictures(image_context_batch, missing_region_batch, epoch + 1, use_gpu, save_dir, generator,
+                          prefix='val')
 
         # normalize loss by size of dataset
         train_gen_loss = train_gen_loss / count_train
         train_disc_loss = train_disc_loss / count_train
         val_gen_loss = val_gen_loss / count_val
         val_disc_loss = val_disc_loss / count_val
+        val_l2_gen_loss = val_l2_gen_loss / count_val
 
         # .numpy() converts the tensors to np arrays, which in this case results in just floats.
         list_train_gen_loss.append(train_gen_loss.numpy())
         list_train_disc_loss.append(train_disc_loss.numpy())
         list_val_gen_loss.append(val_gen_loss.numpy())
         list_val_disc_loss.append(val_disc_loss.numpy())
+        list_l2_val_gen_loss.append(val_l2_gen_loss.numpy())
 
         print('Time for epoch {} is {} sec'.format(epoch + 1, time.time() - start))
         print('Generator - Training loss {} --- Validation loss {}'.format(train_gen_loss, val_gen_loss))
@@ -292,7 +321,8 @@ def train(train_dataset, val_dataset, epochs, overlap, use_gpu, lr, save_dir):
     loss_df = pd.DataFrame({'Gen Training Loss': pd.Series(list_train_gen_loss),
                             'Gen Val Loss': pd.Series(list_val_gen_loss),
                             'Disc Training Loss': pd.Series(list_train_disc_loss),
-                            'Disc Val Loss': pd.Series(list_val_disc_loss)})
+                            'Disc Val Loss': pd.Series(list_val_disc_loss),
+                            'Gen L2 Val Loss': pd.Series(list_l2_val_gen_loss)})
     plot_loss(list_train_gen_loss, list_val_gen_loss, list_train_disc_loss, list_val_disc_loss, save_dir)
 
     filename = os.path.join(save_dir, 'losses.csv')
@@ -306,7 +336,6 @@ Writes a text file to the save directory with a summary of the hyper-parameters 
 
 def write_info_file(save_dir, data_path, overlap, batch_size, use_gpu, epochs, lr,
                     run_number):
-
     filename = os.path.join(save_dir, 'run_info.txt')
     info_list = ['ContextEncoder Hyper-parameters: Run {} \n'.format(run_number),
                  'Training data found at: {} \n'.format(data_path),
@@ -348,11 +377,11 @@ def main(data_path, overlap, batch_size, use_gpu, epochs, lr, run_number):
 
     filename = os.path.join(data_path, 'batch_1_images.h5')
     train_dataset, val_dataset = load_data.load_simulated_data(filename)
-    for i in range(4):
-        filename = os.path.join(data_path, 'batch_{}_images.h5'.format(i+1))
-        new_train_ds, new_val_ds = load_data.load_simulated_data(filename)
-        train_dataset.concatenate(new_train_ds)
-        val_dataset.concatenate(new_val_ds)
+    # for i in range(4):
+    #   filename = os.path.join(data_path, 'batch_{}_images.h5'.format(i+1))
+    #   new_train_ds, new_val_ds = load_data.load_simulated_data(filename)
+    #   train_dataset.concatenate(new_train_ds)
+    #   val_dataset.concatenate(new_val_ds)
     train_dataset = train_dataset.batch(batch_size)
     val_dataset = val_dataset.batch(batch_size)
 
