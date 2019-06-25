@@ -8,8 +8,10 @@ import os
 import pandas as pd
 import pytpc
 from sklearn.utils import shuffle
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 
 def _l(a):
     return 0 if a == 0 else math.log10(a)
@@ -183,7 +185,6 @@ def simulated(projection, data_dir, save_path, prefix):
         test_images[i] = data
         plt.close()
 
-
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -200,3 +201,18 @@ def simulated(projection, data_dir, save_path, prefix):
 
     # h5.create_dataset('max_charge', data=np.array([max_charge]))
     h5.close()
+
+
+@click.command()
+@click.argument('projection', type=click.Choice(['xy', 'zy']), nargs=1)
+@click.argument('data_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True), nargs=1)
+@click.option('--save_dir', type=click.Path(exists=False, file_okay=False, dir_okay=True), default='',
+              help='Where to save the generated data.')
+@click.option('--num_batches', default=5, help='Number of event batches to load')
+def main(projection, data_dir, save_path, num_batches):
+    for i in range(num_batches):
+        simulated(projection, data_dir, save_path, 'batch_{}_'.format(i + 1))
+
+
+if __name__ == '__main__':
+    main()
