@@ -92,28 +92,28 @@ validation tf dataset object containing the image (128x128x3) and broken image e
 
 def load_simulated_data(file_path):
     with h5py.File(file_path) as f:
-        train_features = np.asarray(f['train_features'])
-        train_features_broken = np.asarray(f['train_features_broken'])
-    assert len(train_features) == len(train_features_broken)
+        images = np.asarray(f['train_images'])
+        image_contexts = np.asarray(f['train_image_contexts'])
+    assert len(images) == len(image_contexts)
 
-    train_features = (train_features - 127.5) / 127.5
-    train_features_broken = (train_features_broken - 127.5) / 127.5
+    images = (images - 127.5) / 127.5
+    image_contexts = (image_contexts - 127.5) / 127.5
 
-    partition = int(len(train_features) * 0.8)
+    partition = int(len(images) * 0.8)
 
-    val_features = train_features[partition:, :, :]
-    val_features_broken = train_features_broken[partition:, :, :]
+    val_images = images[partition:, :, :]
+    val_image_contexts = image_contexts[partition:, :, :]
 
-    train_features = train_features[:partition, :, :]
-    train_features_broken = train_features_broken[:partition, :, :]
+    train_images = images[:partition, :, :]
+    train_image_contexts = image_contexts[:partition, :, :]
 
-    train_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_features))
-    train_centers_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_features_broken))
+    train_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_images))
+    train_image_contexts_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_image_contexts))
 
-    val_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_features))
-    val_centers_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_features_broken))
+    val_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_images))
+    val_image_contexts_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_image_contexts))
 
-    train_dataset = tf.data.Dataset.zip((train_images_dataset, train_centers_dataset))
-    val_dataset = tf.data.Dataset.zip((val_images_dataset, val_centers_dataset))
+    train_dataset = tf.data.Dataset.zip((train_image_contexts_dataset, train_images_dataset))
+    val_dataset = tf.data.Dataset.zip((val_image_contexts_dataset, val_images_dataset))
 
     return train_dataset, val_dataset
