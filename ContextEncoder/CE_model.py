@@ -1,9 +1,7 @@
+"""
+Functions to build the autoencoder/generator and discriminator as a keras model objects.
+"""
 import tensorflow as tf
-
-
-'''
-Functions to build the autoencoder/generator and discriminator as a keras model objects. 
-'''
 
 
 def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
@@ -60,6 +58,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                         data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.ReLU()(x)
+    '''
     x = tf.keras.layers.Conv2DTranspose(filters=64,
                                         kernel_size=4,
                                         strides=2,
@@ -67,6 +66,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                         data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.ReLU()(x)
+    
     x = tf.keras.layers.Conv2DTranspose(filters=64,
                                         kernel_size=4,
                                         strides=2,
@@ -74,6 +74,7 @@ def build_autoencoder(use_gpu, channels=3, height=128, width=128,):
                                         data_format=data_format)(x)
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.ReLU()(x)
+    '''
     decoder_output = tf.keras.layers.Conv2DTranspose(filters=3,
                                                      kernel_size=4,
                                                      strides=2,

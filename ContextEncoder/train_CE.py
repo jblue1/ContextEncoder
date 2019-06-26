@@ -19,6 +19,7 @@ import time
 import click
 from datetime import date
 import pandas as pd
+import numpy as np
 
 # Build models, define losses and optimizers
 cross_entropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE,
@@ -109,9 +110,9 @@ def take_step(image_contexts, images, missing_region, overlap, generator, discri
         real_output = discriminator(missing_region, training=True)
         generated_images = generator(image_contexts, training=False)
         if use_gpu:
-            fake_output = discriminator(generated_images[:, :, 60:92, 61:93], training=True)
+            fake_output = discriminator(generated_images, training=True)
         else:
-            fake_output = discriminator(generated_images[:, 60:92, 61:93, :], training=True)
+            fake_output = discriminator(generated_images, training=True)
         disc_loss = discriminator_loss(real_output, fake_output)
 
     discriminator_grads = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -120,7 +121,7 @@ def take_step(image_contexts, images, missing_region, overlap, generator, discri
     # 'fGx' in paper, train the generator
     with tf.GradientTape() as gen_tape:
         generated_images = generator(image_contexts, training=True)
-        gen_loss = generator_loss(fake_output, images, generated_images, overlap, use_gpu)
+        gen_loss = generator_loss(fake_output, missing_region, generated_images, overlap, use_gpu)
 
     generator_grads = gen_tape.gradient(gen_loss, generator.trainable_variables)
     generator_optimizer.apply_gradients(zip(generator_grads, generator.trainable_variables))
@@ -128,21 +129,22 @@ def take_step(image_contexts, images, missing_region, overlap, generator, discri
     return gen_loss, disc_loss
 
 
-@tf.function
+#@tf.function
 def calc_losses(image_contexts, images, missing_region, overlap, use_gpu, generator, discriminator):
     """
     Calculates losses without training
     """
     generated_images = generator(image_contexts, training=False)
     real_output = discriminator(missing_region, training=False)
-    if use_gpu:
-        fake_output = discriminator(generated_images[:, :, 60:92, 61:93], training=True)
-    else:
-        fake_output = discriminator(generated_images[:, 60:92, 61:93, :], training=True)
+    fake_output = discriminator(generated_images, training=False)
+    #if use_gpu:
+     #   fake_output = discriminator(generated_images[:, :, 60:92, 61:93], training=True)
+    # else:
+      #  fake_output = discriminator(generated_images[:, 60:92, 61:93, :], training=True)
 
     disc_loss = discriminator_loss(real_output, fake_output)
-    gen_loss = generator_loss(fake_output, images, generated_images, overlap, use_gpu)
-    l2_gen_loss = generator_loss(fake_output, images, generated_images, overlap, use_gpu, use_adv=False)
+    gen_loss = generator_loss(fake_output, missing_region, generated_images, overlap, use_gpu)
+    l2_gen_loss = generator_loss(fake_output, missing_region, generated_images, overlap, use_gpu, use_adv=False)
 
     return gen_loss, disc_loss, l2_gen_loss
 
@@ -187,16 +189,17 @@ def save_pictures(image_context_batch, missing_region_batch, epoch, use_gpu, sav
     num_pictures: int - number of images to save
     """
     # take data from [-1, 1] range to [0, 1] range for plotting
-    gen_images_batch = (generator(image_context_batch, training=False) + 1) / 2
+    gen_missing_region_batch = (generator(image_context_batch, training=False) + 1) / 2
 
     if len(image_context_batch) < num_pictures:
         num_pictures = 1
 
     if use_gpu:
         image_context_batch = tf.transpose(image_context_batch, (0, 2, 3, 1))
-        gen_images_batch = tf.transpose(gen_images_batch, (0, 2, 3, 1))
-
-    gen_missing_region_batch = gen_images_batch[:, 60:92, 61:93, :]
+        missing_region_batch = tf.transpose(missing_region_batch, (0, 2, 3, 1))
+        gen_missing_region_batch = tf.transpose(gen_missing_region_batch, (0, 2, 3, 1))
+    gen_images_batch = np.asarray(image_context_batch)
+    gen_images_batch[:, 60:92, 61:93, :] = np.asarray(gen_missing_region_batch)
     for i in range(num_pictures):
         filename = os.path.join(save_dir, prefix + '_epoch_{}_{}'.format(epoch, i) + '.png')
         fig, axs = plt.subplots(2, 2)
