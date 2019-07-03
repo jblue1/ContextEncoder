@@ -7,76 +7,59 @@ center regions.
 import h5py
 import numpy as np
 import tensorflow as tf
-import skimage
 
 
-def mask_image(image, mask_size, overlap):
-    """
-    Takes in a numpy representation of an image, and extracts the center
-    mask_size x mask_size chunk. Also sets the center region (minus an
-    overlap on each side) to (0,0,0).
+def load_dataset(data_path, lut_path, height=128, width=175):
+    lut = np.load(lut_path)
+    with h5py.File(data_path) as f:
+        num_events = len(list(f['train'].keys()))
+        partition = int(num_events * 0.8)
+        print(num_events)
+        images = np.empty((num_events, height, width))
+        broken_images = np.empty((num_events, height, width))
+        for i in range(num_events):
+            image = np.zeros((height, width))
+            broken_image = np.zeros((height, width))
+            data = np.asarray(f['train/event{}/data'.format(i)])
+            broken_data = np.asarray(f['train/event{}/broken_data'.format(i)])
 
-    image - numpy representation of an image
-    mask_size - size of chunk to extract
-    """
-    height, width, channels = image.shape
-    start_index = int(height - mask_size * 1.5)
-    end_index = int(start_index + mask_size)
-    center = image[start_index:end_index, start_index:end_index, :]
-    fill = np.zeros([mask_size-overlap*2, mask_size-overlap*2, channels])
-    masked_image = np.copy(image)
-    masked_image[start_index + overlap:end_index-overlap, start_index+overlap:end_index-overlap, :] = fill
+            for j in range(len(data)):
+                pad1 = data[j, 4]
+                pad2 = broken_data[j, 4]
+                if pad1 > 0:
+                    index = int(np.where(lut[:, 2] == pad1)[0][0])
+                    col = int(lut[index, 0])
+                    row = int(lut[index, 1])
+                    # normalize z range from 0-1
+                    z = data[j, 2] / 1250
+                    assert image[row, col] == 0
+                    image[row, col] = z
+                if pad2 > 0:
+                    index = int(np.where(lut[:, 2] == pad2)[0][0])
+                    col = int(lut[index, 0])
+                    row = int(lut[index, 1])
+                    # normalize z range from 0-1
+                    z = data[j, 2] / 1250
+                    assert broken_image[row, col] == 0
+                    broken_image[row, col] = z
+            if i % 500 == 0:
+                print(i)
 
-    return center, masked_image
+        train_images = images[:partition]
+        val_images = images[partition:]
+        train_broken_images = broken_images[:partition]
+        val_broken_images = broken_images[partition:]
 
+    train_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_images))
+    train_broken_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_broken_images))
 
-def load_h5_to_dataset(file_path, overlap, shuffle, height=128, width=128, num_channels=3):
-    """
-    Takes an .h5 file of images and converts in to a tensorflow dataset object.
+    val_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_images))
+    val_broken_image_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_broken_images))
 
-    file_path - path to .h5 file with images
-    """
-    with h5py.File(file_path) as f:
-        list = []
-        for i in range(len(f.keys())):
-            try:
-                name = 'img_{}'.format(i)
-                g = np.asarray(f[name])
-                list.append(i)
-            except KeyError:
-                pass
-        data_images = np.empty((len(list), height, width, num_channels))
-        data_centers = np.empty((len(list), int(height/2), int(width/2), num_channels))
-        count = 0
-        for i in list:
-            # due to problems in download_data.py, for certain values i, img_i might not exist
-            name = 'img_{}'.format(i)
-            g = np.asarray(f[name])
-            if len(g.shape) < 3:
-                layer = g
-                g = np.empty((layer.shape[0], layer.shape[1], 3))
-                for j in range(3):
-                    g[:, :, j] = layer
-            g = skimage.transform.resize(g, (height, width))
-            if g.shape[2] > 3:
-                g = g[:, :, 0:2]
-                print('Had an image with 4 channels')
-            centers, images = mask_image(g, int(height/2), overlap)
-            data_images[count, :, :, :] = images * 2 - 1  # normalize pixels to [-1,1]
-            data_centers[count, :, :, :] = centers * 2 - 1
-            count += 1
-            if i % 1000 == 0:
-                print('Loaded {} images'.format(i))
+    train_dataset = tf.data.Dataset.zip((train_broken_images_dataset, train_images_dataset))
+    val_dataset = tf.data.Dataset.zip((val_broken_image_dataset, val_images_dataset))
 
-        print('Number of images: {}'.format(count))
-    image_dataset = tf.data.Dataset.from_tensor_slices(np.float32(data_images))
-    center_dataset = tf.data.Dataset.from_tensor_slices(np.float32(data_centers))
-    # will do one run with the labels shuffled and then compare with not shuffled, to see if model is learning at all
-    if shuffle:
-        center_dataset = center_dataset.shuffle(len(list))
-    dataset = tf.data.Dataset.zip((image_dataset, center_dataset))
-
-    return dataset
+    return train_dataset, val_dataset
 
 
 def load_simulated_data(file_path):
