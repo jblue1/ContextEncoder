@@ -9,17 +9,19 @@ import numpy as np
 import tensorflow as tf
 
 
-def load_dataset(data_path, lut_path, height=128, width=175):
+def load_dataset(data_path, lut_path, height=128, width=175, small=False):
     lut = np.load(lut_path)
     with h5py.File(data_path) as f:
-        num_events = len(list(f['train'].keys()))
+        if small:
+            num_events = 100
+        else:
+            num_events = len(list(f['train'].keys()))
         partition = int(num_events * 0.8)
-        print(num_events)
-        images = np.empty((num_events, height, width))
-        broken_images = np.empty((num_events, height, width))
+        images = np.empty((num_events, height, width, 1))
+        broken_images = np.empty((num_events, height, width, 1))
         for i in range(num_events):
-            image = np.zeros((height, width))
-            broken_image = np.zeros((height, width))
+            image = np.zeros((height, width, 1))
+            broken_image = np.zeros((height, width, 1))
             data = np.asarray(f['train/event{}/data'.format(i)])
             broken_data = np.asarray(f['train/event{}/broken_data'.format(i)])
 
@@ -30,8 +32,8 @@ def load_dataset(data_path, lut_path, height=128, width=175):
                     index = int(np.where(lut[:, 2] == pad1)[0][0])
                     col = int(lut[index, 0])
                     row = int(lut[index, 1])
-                    # normalize z range from 0-1
-                    z = data[j, 2] / 1250
+                    # normalize z range from -1 to 1
+                    z = (data[j, 2] / 1250)
                     assert image[row, col] == 0
                     image[row, col] = z
                 if pad2 > 0:
@@ -39,12 +41,13 @@ def load_dataset(data_path, lut_path, height=128, width=175):
                     col = int(lut[index, 0])
                     row = int(lut[index, 1])
                     # normalize z range from 0-1
-                    z = data[j, 2] / 1250
+                    z = (broken_data[j, 2] / 1250)
                     assert broken_image[row, col] == 0
                     broken_image[row, col] = z
             if i % 500 == 0:
                 print(i)
-
+            images[i] = image
+            broken_images[i] = broken_image
         train_images = images[:partition]
         val_images = images[partition:]
         train_broken_images = broken_images[:partition]
@@ -93,3 +96,4 @@ def load_simulated_data(file_path):
     val_dataset = tf.data.Dataset.zip((val_image_contexts_dataset, val_images_dataset))
 
     return train_dataset, val_dataset
+
