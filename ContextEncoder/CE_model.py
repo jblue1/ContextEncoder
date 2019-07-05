@@ -60,7 +60,7 @@ def build_autoencoder(use_gpu, channels=1, height=128, width=175,):
                                         kernel_size=4,
                                         strides=2,
                                         padding='same',
-                                        activation='tanh',
+                                        activation='sigmoid',
                                         data_format=data_format)(x)
     decoder_output = tf.keras.layers.Cropping2D(((0, 0), (0, 1)), data_format=data_format)(x)
     autoencoder = tf.keras.Model(encoder_input, decoder_output, name='autoencoder')
