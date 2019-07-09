@@ -9,7 +9,7 @@ in https://www.tensorflow.org/guide/performance/overview
 """
 
 import tensorflow as tf
-from ContextEncoder import CE_model
+import CE_model
 import load_data
 import os
 import matplotlib.pyplot as plt
@@ -18,12 +18,11 @@ import click
 from datetime import date
 import pandas as pd
 from contextlib import redirect_stdout
-import numpy as np
 
 # Build models, define losses and optimizers
 cross_entropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE,
                                                    from_logits=True)
-MSE = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
+MAE = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
 
 
 def discriminator_loss(real_output, fake_output):
@@ -57,7 +56,7 @@ def generator_loss(fake_output, y_true, y_pred, weight_l2=0.9, weight_adv=0.1, u
     et al.
     """
     adv_loss = cross_entropy(tf.ones_like(fake_output), fake_output)
-    l2_loss = MSE(y_true, y_pred)
+    l2_loss = MAE(y_true, y_pred)
     if use_adv:
         total_loss = weight_l2 * l2_loss + weight_adv * adv_loss
     else:
@@ -182,7 +181,7 @@ def save_pictures(broken_images, images, epoch, use_gpu, save_dir, generator, pr
         axs[0].set_title('Broken Image')
         axs[1].imshow(gen_images[i, :, :, 0], cmap='Greys')
         axs[1].set_title('Generated Image')
-        axs[2].imshow(images[i, :, :, 0], cmap='Greys')
+        axs[2].imshow(images[i, 0, :, :], cmap='Greys')
         axs[2].set_title('Original Images')
 
         fig.subplots_adjust(wspace=.5)
@@ -244,7 +243,7 @@ def train(train_dataset, val_dataset, epochs, use_gpu, lr, save_dir):
             train_disc_loss += disc_loss
             count_train += 1
         # every 5th epoch (and the first) save training images for comparison
-        if (epoch + 1) % 1 == 0 or epoch == 0:
+        if (epoch + 1) % 5 == 0 or epoch == 0:
             save_pictures(broken_image_batch, image_batch, epoch + 1, use_gpu, save_dir, generator,
                           prefix='train')
         for broken_image_batch, image_batch in val_dataset:
@@ -326,7 +325,8 @@ def write_info_file(save_dir, data_path, batch_size, use_gpu, epochs, lr,
 @click.option('--lr', default=2e-4, help='Learning rate for Adam optimizer')
 @click.option('--run_number', default=1, help='ith run of the day')
 def main(data_path, lut_path, batch_size, use_gpu, epochs, lr, run_number):
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    #os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    print('Entered main')
     # construct directory to store images, model checkpoints etc.
     today = str(date.today())
     run_number = '_' + str(run_number)
@@ -343,8 +343,8 @@ def main(data_path, lut_path, batch_size, use_gpu, epochs, lr, run_number):
         os.makedirs(save_dir)
     write_info_file(save_dir, data_path, batch_size, use_gpu, epochs, lr,
                     run_number)
-
-    train_dataset, val_dataset = load_data.load_dataset(data_path, lut_path, small=True)
+    print('Wrote info file')
+    train_dataset, val_dataset = load_data.load_dataset(data_path, lut_path)
     print('Loaded Data')
     train_dataset = train_dataset.batch(batch_size)
     val_dataset = val_dataset.batch(batch_size)
