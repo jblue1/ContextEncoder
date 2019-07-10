@@ -8,7 +8,74 @@ import h5py
 import numpy as np
 import tensorflow as tf
 import skimage
+import matplotlib.pyplot as plt
 
+
+def load_data(data_path, indices_path, num_events):
+    with h5py.File(data_path) as f:
+        assert num_events <= len(list(f['train'].keys()))
+        images = np.empty((num_events, 128, 128, 1), dtype=np.uint8)
+        broken_images = np.empty((num_events, 128, 128, 1), dtype=np.uint8)
+        indices = np.load(indices_path)
+        for count, i in enumerate(indices):
+            if count > num_events - 1:
+                break
+            print(count)
+            data = np.asarray(f['train/event{}/data'.format(i)])
+            broken_data = np.asarray(f['train/event{}/broken_data'.format(i)])
+            x = data[:, 0]
+            y = data[:, 1]
+
+            x_b = broken_data[:, 0]
+            y_b = broken_data[:, 1]
+
+            fig = plt.figure(figsize=(1, 1), dpi=128)
+            ax = fig.add_axes([0, 0, 1, 1])
+            ax.set_xlim(-275.0, 275.0)
+            ax.set_ylim((-275.0, 275.0))
+            ax.set_axis_off()
+            ax.scatter(x, y, s=0.1, cmap='Greys')
+            fig.canvas.draw()
+            plt.close()
+            image = np.array(fig.canvas.renderer._renderer, dtype=np.uint8)
+            image = np.delete(image, 3, axis=2)
+            image = image[:, :, 0:1]
+            image = ((image * -1) + 255) / 255
+            images[count] = image
+
+            fig = plt.figure(figsize=(1, 1), dpi=128)
+            ax = fig.add_axes([0, 0, 1, 1])
+            ax.set_xlim(-275.0, 275.0)
+            ax.set_ylim((-275.0, 275.0))
+            ax.set_axis_off()
+            ax.scatter(x_b, y_b, s=0.1, cmap='Greys')
+            fig.canvas.draw()
+            plt.close()
+            broken_image = np.array(fig.canvas.renderer._renderer, dtype=np.uint8)
+            broken_image = np.delete(broken_image, 3, axis=2)
+            broken_image = broken_image[:, :, 0:1]
+            broken_image = ((broken_image * -1) + 255) / 255
+            broken_images[count] = broken_image
+
+        partition = int(len(images) * 0.8)
+
+        val_images = images[partition:, :, :]
+        val_broken_images = broken_images[partition:, :, :]
+
+        train_images = images[:partition, :, :]
+        train_broken_images = broken_images[:partition, :, :]
+
+        train_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_images))
+        train_broken_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(train_broken_images))
+
+        val_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_images))
+        val_broken_images_dataset = tf.data.Dataset.from_tensor_slices(np.float32(val_broken_images))
+
+        train_dataset = tf.data.Dataset.zip((train_broken_images_dataset, train_images_dataset))
+        val_dataset = tf.data.Dataset.zip((val_broken_images_dataset, val_images_dataset))
+
+        print(train_dataset)
+        print(val_dataset)
 
 def mask_image(image, mask_size, overlap):
     """
