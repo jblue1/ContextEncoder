@@ -12,15 +12,18 @@ import matplotlib.pyplot as plt
 
 
 def load_data(data_path, indices_path, num_events):
+    images = np.zeros((num_events, 128, 128, 1), dtype=np.float32)
+    broken_images = np.zeros((num_events, 128, 128, 1), dtype=np.float32)
+    print('loading data')
     with h5py.File(data_path) as f:
         assert num_events <= len(list(f['train'].keys()))
-        images = np.empty((num_events, 128, 128, 1), dtype=np.uint8)
-        broken_images = np.empty((num_events, 128, 128, 1), dtype=np.uint8)
+
         indices = np.load(indices_path)
         for count, i in enumerate(indices):
             if count > num_events - 1:
                 break
-            print(count)
+            if count % 100 == 0:
+                print(count)
             data = np.asarray(f['train/event{}/data'.format(i)])
             broken_data = np.asarray(f['train/event{}/broken_data'.format(i)])
             x = data[:, 0]
@@ -74,10 +77,10 @@ def load_data(data_path, indices_path, num_events):
         train_dataset = tf.data.Dataset.zip((train_broken_images_dataset, train_images_dataset))
         val_dataset = tf.data.Dataset.zip((val_broken_images_dataset, val_images_dataset))
 
-        print(train_dataset)
-        print(val_dataset)
+        return train_dataset, val_dataset
 
-def mask_image(image, mask_size, overlap):
+
+def mask_image(image, mask_size,overlap):
     """
     Takes in a numpy representation of an image, and extracts the center
     mask_size x mask_size chunk. Also sets the center region (minus an
