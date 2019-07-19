@@ -43,7 +43,7 @@ def main(data_path, lut_path, pad_path, write_path):
                 # x and y range from (-280, 280), need to convert to (0, 5600) to use xy_to_pads_LUT
                 col1 = int(round(10 * (x + 280)))
                 row1 = int(round(10 * (280 - y) + 1))  # +1 because xy_to_pads_LUT has extra row on top
-                # check to make sure the column we found matches the original x
+                # check to make sure the column found matches the original x
                 assert x == np.float32(xy_to_pads_LUT[0, col1])
                 pad = xy_to_pads_LUT[row1, col1]
 
