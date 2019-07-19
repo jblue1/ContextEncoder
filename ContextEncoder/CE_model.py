@@ -4,7 +4,7 @@ Functions to build the autoencoder/generator and discriminator as a keras model 
 import tensorflow as tf
 
 
-def build_autoencoder(use_gpu, channels=1, height=128, width=175,):
+def build_autoencoder(use_gpu, channels=1, height=128, width=175):
     if use_gpu:
         data_format = 'channels_first'
         axis = 1
@@ -94,14 +94,10 @@ def build_discriminator(use_gpu, channels=1, height=128, width=175):
     x = tf.keras.layers.BatchNormalization(axis)(x)
     x = tf.keras.layers.LeakyReLU(0.2)(x)
     x = tf.keras.layers.MaxPool2D(2, data_format=data_format)(x)
-    x = tf.keras.layers.Conv2D(filters=512, kernel_size=3, strides=1, padding='same', data_format=data_format)(x)
-    x = tf.keras.layers.BatchNormalization(axis)(x)
-    x = tf.keras.layers.LeakyReLU(0.2)(x)
-    x = tf.keras.layers.MaxPool2D(2, data_format=data_format)(x)
+    x = tf.keras.layers.Dropout(0.3)(x)
     x = tf.keras.layers.Flatten(data_format=data_format)(x)
     discriminator_output = tf.keras.layers.Dense(units=1, activation='sigmoid')(x)
 
     discriminator = tf.keras.Model(discriminator_inputs, discriminator_output, name='discriminator')
 
     return discriminator
-
