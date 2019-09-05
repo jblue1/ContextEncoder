@@ -1,5 +1,7 @@
+"""
+Function to build the FCNN
+"""
 import tensorflow as tf
-import os
 
 
 def build_model():
@@ -19,11 +21,4 @@ def build_model():
     return model
 
 
-def main():
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
-    model = build_model()
-    model.summary()
 
-
-if __name__ == '__main__':
-    main()

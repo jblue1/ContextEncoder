@@ -1,3 +1,7 @@
+"""
+Script to train a FCNN to predict overbiased pad response for the Mg22 run in the AT-TPC
+"""
+
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import os
@@ -10,6 +14,12 @@ from contextlib import redirect_stdout
 
 
 def plot_loss(loss, val_loss, save_dir):
+    """
+    Makes a plot of training and validation loss over the course of training.
+    :param loss: training loss
+    :param val_loss: validation loss
+    :param save_dir: directory to save the image to
+    """
     epochs = range(1, len(loss) + 1)
     plt.plot(epochs, loss, label='Training Loss')
     plt.plot(epochs, val_loss, label='Validation Loss')
@@ -26,10 +36,8 @@ def write_info_file(save_dir, data_path, batch_size, epochs, lr, run_number):
     :param str save_dir: path to directory to save the file to
     :param str data_path: path to .h5 data file
     :param int batch_size: size of batches used in training
-    :param bool use_gpu: whether or not a gpu was used during training
     :param int epochs: number of epochs network was trained for
-    :param float disc_lr: learning rate for the discriminator
-    :param float gen_lr: learning rate for the generator
+    :param float lr: learning rate for the optimizer
     :param str run_number: Run number of the day
     """
     filename = os.path.join(save_dir, 'run_info.txt')
@@ -76,21 +84,13 @@ def main(data_path, indices_path, pads_path, batch_size, num_events, epochs, lr,
             model.summary()
 
     adam = tf.keras.optimizers.Adam(lr=lr)
-    #model.compile(optimizer=tf.keras.optimizers.Adam(lr), loss=MSE)
     model.compile(optimizer=adam, loss='mse')
 
-    '''
-    train_features, val_features, train_targets, val_targets = load_data.load_dataset(data_path,
-                                                                                      indices_path,
-                                                                                      pads_path,
-                                                                                      num_events)
-    '''
     features, targets = load_data.load_dataset(data_path,
                                                indices_path,
                                                pads_path,
                                                num_events)
 
-    #train_features, val_features, train_targets, val_targets = load_data.load_data(num_events)
     checkpoint_path = os.path.join(save_dir, "checkpoints/cp-{epoch:04d}.ckpt")
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         checkpoint_path, verbose=1, save_weights_only=True,
@@ -104,13 +104,12 @@ def main(data_path, indices_path, pads_path, batch_size, num_events, epochs, lr,
                         batch_size=batch_size,
                         callbacks=[cp_callback])
 
-
     loss = pd.Series(history.history['loss'])
     val_loss = pd.Series(history.history['val_loss'])
     loss_df = pd.DataFrame({'Training Loss': loss,
                             'Val Loss': val_loss})
     filename = os.path.join(save_dir, 'losses.csv')
-    loss_df.to_csv(filename)
+    loss_df.to_csv(filename)  # save losses for further plotting/analysis
     plot_loss(loss, val_loss, save_dir)
 
 
