@@ -2,6 +2,8 @@
   <dictionary name="johnblue">
     <words>
       <w>autoencoder</w>
+      <w>convnet</w>
+      <w>fcnn</w>
     </words>
   </dictionary>
 </component>
