@@ -101,3 +101,12 @@ def build_discriminator(use_gpu, channels=1, height=128, width=175):
     discriminator = tf.keras.Model(discriminator_inputs, discriminator_output, name='discriminator')
 
     return discriminator
+
+
+def main():
+    model = build_autoencoder(False)
+    model.summary()
+
+
+if __name__ == '__main__':
+    main()
