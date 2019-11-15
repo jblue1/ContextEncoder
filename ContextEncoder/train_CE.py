@@ -64,16 +64,18 @@ def generator_loss(fake_output, y_true, y_pred, weight_l2=0.9, weight_adv=0.1, u
     :param bool use_adv: Whether or not to use the adversarial loss
     :return tf.Tensor: Calculated loss
     """
+    reg_loss = (tf.math.reduce_sum(y_pred) / 22400) * 0.1
+    print('reg_loss: {}'.format(reg_loss))
     adv_loss = cross_entropy(tf.ones_like(fake_output), fake_output)
     l2_loss = MSE(y_true, y_pred)
     if use_adv:
-        total_loss = weight_l2 * l2_loss + weight_adv * adv_loss
+        total_loss = weight_l2 * l2_loss + weight_adv * adv_loss + reg_loss
     else:
         total_loss = l2_loss
     return total_loss
 
 
-#@tf.function
+@tf.function
 def take_step(broken_images, images, generator, discriminator, use_gpu, generator_optimizer,
               discriminator_optimizer, weight_adv, train_disc=True, train_gen=True):
     """
@@ -125,7 +127,7 @@ def take_step(broken_images, images, generator, discriminator, use_gpu, generato
     return gen_loss, disc_loss
 
 
-#@tf.function
+@tf.function
 def calc_losses(broken_images, images, use_gpu, generator, discriminator, weight_adv):
     """
     Calculates losses without training. All params are the same as take_step()
@@ -249,14 +251,6 @@ def train(train_dataset, val_dataset, epochs, use_gpu, disc_lr, gen_lr, save_dir
     list_val_disc_loss = []
     list_l2_val_gen_loss = []
     for epoch in range(epochs):
-        if epoch < 10:
-            weight_adv = 0.01
-        elif epoch < 50:
-            weight_adv = 0.1
-        elif epoch < 100:
-            weight_adv = 0.25
-        else:
-            weight_adv = 0.5
         start = time.time()
         train_gen_loss = 0
         train_disc_loss = 0
@@ -276,8 +270,7 @@ def train(train_dataset, val_dataset, epochs, use_gpu, disc_lr, gen_lr, save_dir
                                             discriminator,
                                             use_gpu,
                                             generator_optimizer,
-                                            discriminator_optimizer,
-                                            weight_adv)
+                                            discriminator_optimizer)
             train_gen_loss += gen_loss
             train_disc_loss += disc_loss
             count_train += 1
