@@ -10,7 +10,31 @@ from datetime import date
 import FCNN_model
 import load_data
 import pandas as pd
+import numpy as np
 from contextlib import redirect_stdout
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from tensorflow.keras.callbacks import Callback
+
+class Metrics(Callback):
+    def __init__(self, val_features, val_targets):
+        self.val_features = val_features
+        self.val_targ = val_targets
+
+    def on_train_begin(self, logs={}):
+        self.val_f1s = []
+        self.val_recalls = []
+        self.val_precisions = []
+
+    def on_epoch_end(self, epoch, logs={}):
+        val_predict = (np.asarray(self.model.predict(self.val_features))).round()
+        _val_recall = recall_score(self.val_targ, val_predict, average='micro')
+        _val_precision = precision_score(self.val_targ, val_predict, average='micro')
+        _val_f1 = 2 * (_val_precision * _val_recall) / (_val_precision + _val_recall)
+        self.val_f1s.append(_val_f1)
+        self.val_recalls.append(_val_recall)
+        self.val_precisions.append(_val_precision)
+        print('- val_f1: {}  - val_precision: {}  -val_recall: {}'.format(_val_f1, _val_precision, _val_recall))
+        return
 
 
 def plot_loss(loss, val_loss, save_dir):
@@ -30,7 +54,7 @@ def plot_loss(loss, val_loss, save_dir):
     plt.close()
 
 
-def write_info_file(save_dir, data_path, batch_size, epochs, lr, run_number):
+def write_info_file(save_dir, features_path, targets_path, batch_size, epochs, lr, run_number):
     """
     Writes a text file to the save directory with a summary of the hyper-parameters used for training
     :param str save_dir: path to directory to save the file to
@@ -42,7 +66,7 @@ def write_info_file(save_dir, data_path, batch_size, epochs, lr, run_number):
     """
     filename = os.path.join(save_dir, 'run_info.txt')
     info_list = ['ContextEncoder Hyper-parameters: Run {} \n'.format(run_number),
-                 'Training data found at: {} \n'.format(data_path),
+                 'Training data found at: {} and {} \n'.format(features_path, targets_path),
                  'Batch Size: {} \n'.format(batch_size),
                  'Epochs: {} \n'.format(epochs),
                  'Learning Rate: {} \n'.format(lr)]
@@ -52,15 +76,13 @@ def write_info_file(save_dir, data_path, batch_size, epochs, lr, run_number):
 
 
 @click.command()
-@click.argument('data_path', type=click.Path(exists=True, readable=True))
-@click.argument('indices_path', type=click.Path(exists=True, readable=True))
-@click.argument('pads_path', type=click.Path(exists=True, readable=True))
+@click.argument('features_path', type=click.Path(exists=True, readable=True))
+@click.argument('targets_path', type=click.Path(exists=True, readable=True))
 @click.option('--batch_size', default=32)
-@click.option('--num_events', default=-1)
 @click.option('--epochs', default=50)
 @click.option('--lr', default=0.001, help='Learning rate for Adam optimizer')
 @click.option('--run_number', default=1, help='ith run of the day')
-def main(data_path, indices_path, pads_path, batch_size, num_events, epochs, lr, run_number):
+def main(features_path, targets_path, batch_size, epochs, lr, run_number):
     today = str(date.today())
     run_number = '_' + str(run_number)
     save_dir = './Run_FCNN_' + today + run_number
@@ -74,7 +96,7 @@ def main(data_path, indices_path, pads_path, batch_size, num_events, epochs, lr,
             return
     else:
         os.makedirs(save_dir)
-    write_info_file(save_dir, data_path, batch_size, epochs, lr, run_number)
+    write_info_file(save_dir, features_path, targets_path, batch_size, epochs, lr, run_number)
 
     model = FCNN_model.build_model()
     # write .txt file with model summary
@@ -84,25 +106,37 @@ def main(data_path, indices_path, pads_path, batch_size, num_events, epochs, lr,
             model.summary()
 
     adam = tf.keras.optimizers.Adam(lr=lr)
-    model.compile(optimizer=adam, loss='mse')
+    model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['binary_accuracy'])
 
-    features, targets = load_data.load_dataset(data_path,
-                                               indices_path,
-                                               pads_path,
-                                               num_events)
+    features = np.load(features_path)
+    print(np.max(features))
+    features /= np.max(features)
+    print('Loaded features')
+    targets = np.load(targets_path)
+    assert np.max(targets) == 1
+    assert np.min(targets) == 0
 
+    split = round(0.8 * len(features))
+    train_features = features[:split]
+    val_features = features[split:]
+
+    train_targets = targets[:split]
+    val_targets = targets[split:]
+    print('Loaded Targets')
+
+    metrics = Metrics(val_features, val_targets)
     checkpoint_path = os.path.join(save_dir, "checkpoints/cp-{epoch:04d}.ckpt")
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         checkpoint_path, verbose=1, save_weights_only=True,
         # Save weights, every 5-epochs.
         period=5)
-    history = model.fit(features,
-                        targets,
-                        validation_split=0.2,
-                        # validation_data=(val_features, val_targets),
+    history = model.fit(train_features,
+                        train_targets,
+                        # validation_split=0.2,
+                        validation_data=(val_features, val_targets),
                         epochs=epochs,
                         batch_size=batch_size,
-                        callbacks=[cp_callback])
+                        callbacks=[cp_callback, metrics])
 
     loss = pd.Series(history.history['loss'])
     val_loss = pd.Series(history.history['val_loss'])
