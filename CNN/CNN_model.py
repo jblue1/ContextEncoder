@@ -32,7 +32,7 @@ def build_CNN(use_gpu):
     x = tf.keras.layers.Dropout(0.3)(x)
     x = tf.keras.layers.Dense(5000)(x)
     x = tf.keras.layers.Dropout(0.3)(x)
-    output = tf.keras.layers.Dense(4608)(x)
+    output = tf.keras.layers.Dense(4608, activation='sigmoid')(x)
     cnn = tf.keras.Model(input, output, name='cnn')
     return cnn
 
