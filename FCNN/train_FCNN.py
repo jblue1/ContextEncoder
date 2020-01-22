@@ -15,6 +15,7 @@ from contextlib import redirect_stdout
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from tensorflow.keras.callbacks import Callback
 
+
 class Metrics(Callback):
     def __init__(self, val_features, val_targets):
         self.val_features = val_features
@@ -33,7 +34,8 @@ class Metrics(Callback):
         self.val_f1s.append(_val_f1)
         self.val_recalls.append(_val_recall)
         self.val_precisions.append(_val_precision)
-        print('- val_f1: {}  - val_precision: {}  -val_recall: {}'.format(_val_f1, _val_precision, _val_recall))
+        print(' - val_f1: {}  - val_precision: {}  - val_recall: {}'.format(_val_f1, _val_precision, _val_recall))
+        print(' ')
         return
 
 
@@ -140,8 +142,15 @@ def main(features_path, targets_path, batch_size, epochs, lr, run_number):
 
     loss = pd.Series(history.history['loss'])
     val_loss = pd.Series(history.history['val_loss'])
+    recall = pd.Series(history.history['val_recall'])
+    precision = pd.Series(history.history['val_precision'])
+    f1 = pd.Series(history.history['val_f1'])
+
     loss_df = pd.DataFrame({'Training Loss': loss,
-                            'Val Loss': val_loss})
+                            'Val Loss': val_loss,
+                            'Recall': recall,
+                            'Precision': precision,
+                            'F1 Score': f1})
     filename = os.path.join(save_dir, 'losses.csv')
     loss_df.to_csv(filename)  # save losses for further plotting/analysis
     plot_loss(loss, val_loss, save_dir)
