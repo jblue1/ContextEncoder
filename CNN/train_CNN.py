@@ -6,6 +6,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import date
 import pandas as pd
+from sklearn.metrics import precision_score, recall_score
+from tensorflow.keras.callbacks import Callback
+
+
+class Metrics(Callback):
+    def __init__(self, val_features, val_targets):
+        self.val_features = val_features
+        self.val_targ = val_targets
+
+    def on_train_begin(self, logs={}):
+        self.val_f1s = []
+        self.val_recalls = []
+        self.val_precisions = []
+
+    def on_epoch_end(self, epoch, logs={}):
+        val_predict = (np.asarray(self.model.predict(self.val_features))).round()
+        _val_recall = recall_score(self.val_targ, val_predict, average='micro')
+        _val_precision = precision_score(self.val_targ, val_predict, average='micro')
+        _val_f1 = 2 * (_val_precision * _val_recall) / (_val_precision + _val_recall)
+        self.val_f1s.append(_val_f1)
+        self.val_recalls.append(_val_recall)
+        self.val_precisions.append(_val_precision)
+        print(' - val_f1: {}  - val_precision: {}  - val_recall: {}'.format(_val_f1, _val_precision, _val_recall))
+        print(' ')
+        return
 
 
 def plot_loss(loss, val_loss, save_dir):
@@ -46,30 +71,42 @@ def main(features_path, targets_path, batch_size, use_gpu, epochs, lr, run_numbe
         os.makedirs(save_dir)
     MSE = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
     model = CNN_model.build_CNN(use_gpu)
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr), loss=MSE)
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr), loss='binary_crossentropy', metrics=['binary_accuracy'])
     print('Model is Compiled')
-    features = np.load(features_path)
-    print(np.max(features))
+    features = np.load(features_path)[:20000]
+    print(features.shape)
     features /= np.max(features)
     features = tf.expand_dims(features, -1)
+    print(features.shape)
+    features = tf.transpose(features, perm=[0, 3, 1, 2])
+    print(features.shape)
     print('Loaded features')
-    targets = np.load(targets_path)
+    targets = np.load(targets_path)[:20000]
     targets /= np.max(targets)
+    print(np.max(targets))
     print('Loaded Targets')
 
+    split = round(0.8 * len(features))
+    train_features = features[:split]
+    val_features = features[split:]
 
+    train_targets = targets[:split]
+    val_targets = targets[split:]
+    print('Loaded Targets')
+
+    metrics = Metrics(val_features, val_targets)
     checkpoint_path = os.path.join(save_dir, "checkpoints/cp-{epoch:04d}.ckpt")
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         checkpoint_path, verbose=1, save_weights_only=True,
         # Save weights, every 5-epochs.
         period=5)
-    history = model.fit(features,
-                        targets,
+    history = model.fit(train_features,
+                        train_targets,
                         batch_size=batch_size,
                         epochs=epochs,
-                        validation_split=0.2,
-                        callbacks=[cp_callback])
+                        validation_data=(val_features, val_targets),
+                        callbacks=[cp_callback, metrics])
 
     loss = pd.Series(history.history['loss'])
     val_loss = pd.Series(history.history['val_loss'])
